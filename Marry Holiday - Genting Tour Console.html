@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Genting Tour Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Genting bus desk. See DESIGN.md.
+   Layout: header + day switch, demo strip, daily overview (tally + bus table), then the selected bus:
+   facts row, customer list (left) and a 1+2 coach seat map with 30 seats (right).
+   Light only: the client asked for a white page. Colour is reserved for seat status; the interface itself is ink on white. */
+:root{
+  --bg:#ffffff; --ink:#17191e; --ink-2:#343842; --muted:#636a77; --faint:#9aa1ad;
+  --line:#e6e8ec; --line-strong:#cdd1d8; --soft:#f5f6f7; --soft-2:#eceef1;
+  --ok:#1e7d3c; --ok-deep:#17662f; --ok-soft:#e7f4eb;
+  --wait:#e5952a; --wait-deep:#b6720f; --wait-ink:#7a4a00; --wait-soft:#fdf1dd;
+  --no:#c9382b; --no-deep:#a32a20; --no-soft:#fbe9e7;
+  --on-ink:#ffffff; --on-wait:#2b1a00;
+  --font:'Geist', 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --mono:'Geist Mono', ui-monospace, 'SF Mono', Consolas, 'Courier New', monospace;
+  --r-lg:14px; --r-md:9px; --r-sm:5px;
+  --ease-out:cubic-bezier(.23, 1, .32, 1); --ease-drawer:cubic-bezier(.32, .72, 0, 1);
+  --shade:rgb(23 25 30 / .32);
+  --lift:0 10px 28px rgb(23 25 30 / .16);
+  --z-overlay:40; --z-panel:41; --z-modal:50; --z-ghost:70; --z-toast:80;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font-family:var(--font); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased}
+button,input,select{font:inherit; color:inherit}
+input,select{font-size:16px}
+h1,h2,h3{margin:0; font-weight:600; letter-spacing:-.012em}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.skip{position:absolute; left:16px; top:8px; transform:translateY(-200%); background:var(--ink); color:var(--on-ink); padding:8px 12px; border-radius:var(--r-md); z-index:var(--z-toast)}
+.skip:focus{transform:none}
+.wrap{max-width:1180px; margin:0 auto; padding-inline:20px; padding-block:22px 64px; display:flex; flex-direction:column; gap:20px}
+#main,#board{display:flex; flex-direction:column; gap:20px; min-width:0}
+
+/* Header */
+.head{display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; justify-content:space-between}
+.brand h1{font-size:22px; letter-spacing:-.028em; line-height:1.1}
+.brand p{margin:3px 0 0; color:var(--muted); font-size:14px}
+.seg{display:inline-flex; background:var(--soft-2); border-radius:var(--r-md); padding:3px; gap:2px}
+.seg button{border:0; background:none; min-height:38px; padding:0 14px; border-radius:7px; cursor:pointer; font-weight:500; color:var(--muted); transition:color .15s ease, background-color .15s ease, transform .16s var(--ease-out)}
+.seg button:active{transform:scale(.97)}
+.seg button.on{background:var(--bg); color:var(--ink); box-shadow:0 1px 2px rgb(23 25 30 / .14)}
+.seg small{font-size:12px; font-weight:500; color:var(--muted); margin-left:6px}
+
+/* Demo strip */
+.demo{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; justify-content:space-between; background:var(--soft); border-radius:var(--r-lg); padding:10px 12px 10px 16px}
+.demo p{margin:0; flex:1 1 420px; min-width:0; max-width:80ch; text-wrap:pretty}
+.demo .step{font-weight:600; margin-right:3px}
+.demo .btns{display:flex; gap:6px}
+
+/* Buttons */
+.btn{min-height:40px; padding:0 14px; border-radius:var(--r-md); border:1px solid var(--line-strong); background:var(--bg); cursor:pointer; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; transition:transform .16s var(--ease-out), background-color .15s ease, border-color .15s ease}
+.btn:active{transform:scale(.97)}
+.btn.main{background:var(--ink); border-color:var(--ink); color:var(--on-ink)}
+.btn.sm{min-height:34px; padding:0 12px; font-size:14px}
+.btn:disabled{opacity:.38; cursor:not-allowed; transform:none}
+
+/* Containers */
+.card{border:1px solid var(--line); border-radius:var(--r-lg); background:var(--bg); min-width:0}
+.card-head{display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between; padding:13px 16px; border-bottom:1px solid var(--line)}
+.card-head h2{font-size:17px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px}
+.card-head h2 .sub{font-weight:400; color:var(--muted); font-size:15px; letter-spacing:0}
+/* Malaysian number plate: white characters on black */
+.plate{font:600 13px/1 var(--mono); letter-spacing:.05em; background:var(--ink); color:var(--on-ink); padding:5px 7px 4px; border-radius:4px}
+
+/* Overview */
+.tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.tools input,.search input{min-height:40px; border:1px solid var(--line-strong); border-radius:var(--r-md); padding:0 12px; background:var(--bg); max-width:100%}
+.tools input{width:280px; min-height:34px; font-size:15px}
+.tally{display:flex; flex-wrap:wrap; gap:6px 30px; padding:14px 16px; margin:0}
+.tally div{display:flex; flex-direction:row-reverse; justify-content:flex-end; align-items:baseline; gap:8px}
+.tally dt{color:var(--muted); font-size:14px}
+.tally dd{margin:0; font:600 22px/1 var(--mono); letter-spacing:-.03em}
+.tally .w dt::before,.tally .b dt::before{content:""; display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; background:var(--wait)}
+.tally .b dt::before{background:var(--no)}
+.table-wrap{overflow-x:auto; border-top:1px solid var(--line)}
+table.ov{width:100%; border-collapse:collapse; min-width:620px}
+.ov th{font-size:13px; color:var(--muted); font-weight:500; text-align:left; padding:9px 16px; border-bottom:1px solid var(--line)}
+.ov td{padding:11px 16px; border-bottom:1px solid var(--line)}
+.ov tbody tr:last-child td{border-bottom:0}
+.ov tfoot td{font-weight:600; border-top:1px solid var(--line); border-bottom:0}
+.ov .num{text-align:right}
+.ov td.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.ov tbody tr{cursor:pointer; transition:background-color .15s ease}
+.ov tbody tr.on{background:var(--soft)}
+.ov tbody tr.on td:first-child{box-shadow:inset 3px 0 0 var(--ink)}
+.ov b{font-weight:600}
+.ov small{color:var(--muted); display:block; font-size:13px}
+.c-stay{color:var(--wait-ink); font-weight:600}
+.c-back{color:var(--no-deep); font-weight:600}
+.empty-day{padding:36px 16px; color:var(--muted); display:flex; flex-direction:column; align-items:flex-start; gap:12px}
+.empty-day b{color:var(--ink); font-size:17px; font-weight:600}
+
+/* Bus facts */
+.info{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px 24px; padding:14px 16px 16px}
+.info div{min-width:0}
+.info span{display:block; font-size:13px; color:var(--muted)}
+.info b{display:block; font-weight:600; font-size:16px; letter-spacing:-.01em}
+.info small{color:var(--muted); font-size:13.5px}
+@media (max-width:720px){ .info{grid-template-columns:repeat(2, minmax(0,1fr))} }
+
+/* Main grid */
+.grid{display:grid; grid-template-columns:minmax(0, 380px) minmax(0, 1fr); gap:20px; align-items:start}
+@media (max-width:900px){ .grid{grid-template-columns:minmax(0,1fr)} }
+
+/* Customer list */
+.search{padding:12px 16px 6px}
+.search input{width:100%}
+.group{padding:10px 10px 12px; border-radius:10px; margin:4px 6px; border:1.5px dashed transparent; transition:background-color .15s ease, border-color .15s ease}
+.group h3{font-size:13.5px; font-weight:500; letter-spacing:0; color:var(--muted); display:flex; align-items:center; gap:8px; margin:0 6px 6px}
+.group h3 i{width:8px; height:8px; border-radius:2px; flex:none}
+.group.back h3 i{background:var(--no)}
+.group.staying h3 i{background:var(--wait)}
+.group.returned h3 i{background:var(--faint)}
+.group.going h3 i{background:var(--ink)}
+.rows{max-height:520px; overflow-y:auto; overscroll-behavior:contain}
+.rows.tall{max-height:760px}
+.group .hint{font-size:14px; color:var(--muted); padding:6px}
+.dragging .group.ok{border-color:var(--line-strong)}
+.group.ok.over{border-color:var(--ink); background:var(--soft)}
+.row{display:grid; grid-template-columns:20px minmax(0,1fr) auto; gap:10px; align-items:center; padding:5px 6px; border-radius:8px; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; transition:background-color .15s ease, opacity .15s ease}
+.row + .row{border-top:1px solid var(--line)}
+.row.src{opacity:.4}
+.rtext{min-width:0}
+.grip{color:var(--faint); display:grid; place-items:center; touch-action:none; min-height:36px}
+.nm{font-weight:500; font-size:15px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.meta{font-size:13px; color:var(--muted)}
+.badge{font-size:12.5px; font-weight:500; line-height:1; padding:5px 8px; border-radius:var(--r-sm); white-space:nowrap; font-variant-numeric:tabular-nums}
+.badge.back{background:var(--no-soft); color:var(--no-deep)}
+.badge.staying{background:var(--wait-soft); color:var(--wait-ink)}
+.badge.returned{background:var(--soft-2); color:var(--muted)}
+.badge.lg{font-size:14px; padding:7px 10px; display:inline-block}
+.nights{margin-left:8px}
+details.group summary{cursor:pointer; list-style:none}
+details.group summary::-webkit-details-marker{display:none}
+details.group summary h3{margin-bottom:0}
+details.group[open] summary h3{margin-bottom:6px}
+
+/* Seat map */
+.tabs{display:flex; border-bottom:1px solid var(--line); overflow-x:auto}
+.tabs button{flex:1; border:0; background:none; padding:12px 16px 11px; cursor:pointer; text-align:left; border-bottom:2px solid transparent; margin-bottom:-1px; min-width:150px; color:var(--muted); transition:color .15s ease, border-color .15s ease}
+.tabs button b{display:block; font-size:15.5px; font-weight:600; letter-spacing:-.01em}
+.tabs button span{font-size:13px; font-variant-numeric:tabular-nums}
+.tabs button.on{border-bottom-color:var(--ink); color:var(--ink)}
+.map{padding:18px 16px 20px; display:flex; flex-direction:column; gap:16px; align-items:center}
+.legend{display:flex; flex-wrap:wrap; gap:8px 18px; font-size:14px; color:var(--muted); justify-content:center}
+.legend > span{display:inline-flex; align-items:center; gap:6px}
+.legend .seat{display:inline-flex; padding:0; cursor:default; opacity:1 !important}
+.legend .seat svg{width:22px; height:20px; transform:none !important}
+
+.coach{width:100%; max-width:372px; border:2px solid var(--line-strong); border-radius:36px 36px 14px 14px; padding:14px 14px 18px; background:var(--soft)}
+.cab{display:flex; justify-content:space-between; align-items:center; padding:0 6px 12px; margin-bottom:14px; border-bottom:1px solid var(--line-strong)}
+.cab .door-f{font-size:12px; font-weight:500; color:var(--muted); border:1.5px dashed var(--line-strong); border-radius:6px; padding:4px 10px}
+.cab .drv{display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--muted); font-size:12px; font-weight:500}
+.cab .drv svg{width:32px; height:32px; color:var(--faint)}
+.seats{display:grid; grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr) minmax(0,1fr); column-gap:8px; row-gap:4px}
+.aisle{display:block}
+.seat{--f:var(--bg); --f2:var(--bg); --s:var(--ok); --t:var(--ok);
+  border:0; background:none; padding:2px 0 0; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:1px; min-width:0; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; border-radius:8px; transition:opacity .15s ease}
+.seat svg{width:54px; height:50px; display:block; overflow:visible; transition:transform .16s var(--ease-out)}
+.seat .back,.seat .cush,.seat .arm{stroke:var(--s); stroke-width:2; transition:fill .15s ease}
+.seat .back{fill:var(--f)}
+.seat .cush,.seat .arm{fill:var(--f2)}
+.seat text{fill:var(--t); font:600 12px var(--mono); text-anchor:middle}
+.seat .who{font-size:12.5px; font-weight:500; line-height:1.2; height:2.4em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; text-align:center; color:var(--ink); max-width:100%; padding:0 2px; overflow-wrap:anywhere}
+.seat.free .who{color:transparent}
+.seat.taken{--f:var(--no); --f2:var(--no-deep); --s:var(--no-deep); --t:var(--on-ink); touch-action:none}
+.seat.hold{--f:var(--wait); --f2:var(--wait-deep); --s:var(--wait-deep); --t:var(--on-wait)}
+.seats .seat:active svg{transform:scale(.95)}
+.seat.flash svg{animation:pop .36s var(--ease-out)}
+.seat.src svg{opacity:.4}
+.dragging .seats .seat.free:not(.ok){opacity:.3}
+.dragging .seat.ok{--f:var(--ok-soft); --f2:var(--ok-soft)}
+.seats .seat.over{--f:var(--ok); --f2:var(--ok-deep); --t:var(--on-ink)}
+.seats .seat.over svg{transform:scale(1.08)}
+.map-foot{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center}
+.done{color:var(--muted); font-weight:500}
+
+/* Drag ghost: moved with transform only */
+.ghost{position:fixed; left:0; top:0; z-index:var(--z-ghost); pointer-events:none; background:var(--ink); color:var(--on-ink); padding:7px 12px; border-radius:var(--r-md); font-weight:500; white-space:nowrap; box-shadow:var(--lift); will-change:transform}
+body.dragging, body.dragging *{cursor:grabbing !important}
+
+/* Details panel */
+.shade{position:fixed; inset:0; background:var(--shade); z-index:var(--z-overlay)}
+.panel{position:fixed; z-index:var(--z-panel); top:0; right:0; bottom:0; width:min(400px, 100%); background:var(--bg); display:flex; flex-direction:column; box-shadow:-12px 0 32px rgb(23 25 30 / .10); padding-top:env(safe-area-inset-top, 0px); padding-bottom:env(safe-area-inset-bottom, 0px)}
+.panel-top{display:flex; justify-content:space-between; gap:10px; padding:18px 12px 16px 18px; border-bottom:1px solid var(--line)}
+.panel-top h2{font-size:21px; letter-spacing:-.022em}
+.panel-top p{margin:3px 0 0; color:var(--muted); font-size:14px}
+.panel-body{padding:18px; overflow:auto; display:flex; flex-direction:column; gap:18px}
+.x{width:40px; height:40px; border:0; background:none; border-radius:var(--r-md); cursor:pointer; color:var(--muted); display:grid; place-items:center; flex:none; transition:background-color .15s ease, transform .16s var(--ease-out)}
+.x:active{transform:scale(.94)}
+table.hist{width:100%; border-collapse:collapse}
+.hist th,.hist td{text-align:left; padding:9px 6px; border-bottom:1px solid var(--line); vertical-align:top}
+.hist th{color:var(--muted); font-weight:500; font-size:13px}
+.hist tbody tr:last-child td{border-bottom:0}
+.note{background:var(--ok-soft); color:var(--ok-deep); border-radius:var(--r-md); padding:10px 12px; font-size:14px}
+.stack{display:flex; flex-direction:column; gap:8px}
+
+/* Forms */
+.modal-bg{position:fixed; inset:0; z-index:var(--z-modal); background:var(--shade); display:grid; place-items:center; padding:16px; overflow:auto}
+.modal{background:var(--bg); border-radius:var(--r-lg); width:min(440px, 100%); box-shadow:0 24px 48px rgb(23 25 30 / .18)}
+.modal-top{display:flex; justify-content:space-between; align-items:center; padding:10px 10px 10px 18px; border-bottom:1px solid var(--line)}
+.modal-top h2{font-size:17px}
+.modal form{padding:18px; display:flex; flex-direction:column; gap:14px}
+.modal label{display:flex; flex-direction:column; gap:6px; font-weight:500; font-size:14px}
+.modal input:not([type=radio]),.modal select{min-height:44px; padding:0 12px; border:1px solid var(--line-strong); border-radius:var(--r-md); background:var(--bg); font-weight:400; width:100%}
+.modal input[type=radio]{accent-color:var(--ink)}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+@media (max-width:420px){ .two{grid-template-columns:1fr} }
+.choice{display:flex; gap:8px; flex-wrap:wrap}
+.choice label{flex:1 1 150px; flex-direction:row; align-items:center; gap:8px; border:1px solid var(--line-strong); border-radius:var(--r-md); padding:10px 12px; cursor:pointer; font-weight:500; font-size:15px; transition:background-color .15s ease, border-color .15s ease}
+.choice label:has(input:checked){border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); background:var(--soft)}
+.choice label:has(input:disabled){opacity:.45; cursor:not-allowed}
+.msg{border-radius:var(--r-md); padding:10px 12px; font-size:14px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; background:var(--wait-soft); color:var(--wait-ink)}
+.confirm-box{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; background:var(--soft); border-radius:var(--r-md); padding:12px 14px; margin:0}
+.confirm-box span{color:var(--muted)}
+.confirm-box b{font-weight:600}
+.foot{display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap}
+#dup:empty,#tErr:empty{display:none}
+.sep{font-size:13px; font-weight:500; color:var(--muted); padding-top:2px}
+
+/* Toast: transition, so quick repeats retarget instead of restarting */
+.toast{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom, 0px) + 22px); z-index:var(--z-toast); background:var(--ink); color:var(--on-ink); padding:11px 16px; border-radius:var(--r-md); font-weight:500; max-width:calc(100% - 32px); box-shadow:var(--lift); opacity:0; transform:translate(-50%, 10px); pointer-events:none; transition:opacity .2s ease, transform .22s var(--ease-out)}
+.toast.show{opacity:1; transform:translate(-50%, 0)}
+
+/* Entrances: only on open, never on re-render */
+.shade.enter,.modal-bg.enter{animation:fade .2s ease-out}
+.panel.enter{animation:slide .26s var(--ease-drawer)}
+.modal-bg.enter .modal{animation:rise .2s var(--ease-out)}
+@keyframes fade{from{opacity:0}}
+@keyframes slide{from{transform:translateX(100%)}}
+@keyframes rise{from{opacity:0; transform:scale(.96)}}
+@keyframes pop{from{transform:scale(.82)}}
+
+/* Hover only where there is a real pointer */
+@media (hover:hover) and (pointer:fine){
+  .btn:hover{background:var(--soft)}
+  .btn.main:hover{background:var(--ink-2); border-color:var(--ink-2)}
+  .btn:disabled:hover{background:var(--bg)}
+  .btn.main:disabled:hover{background:var(--ink); border-color:var(--ink)}
+  .seg button:not(.on):hover{color:var(--ink)}
+  .ov tbody tr:not(.on):hover{background:var(--soft)}
+  .row:hover{background:var(--soft)}
+  .tabs button:not(.on):hover{color:var(--ink)}
+  .x:hover{background:var(--soft)}
+  .seats .seat:hover svg{transform:scale(1.04)}
+}
+/* Fingers need bigger targets */
+@media (pointer:coarse){
+  .btn{min-height:44px} .btn.sm{min-height:40px} .seg button{min-height:44px} .tools input{min-height:40px} .x{width:44px; height:44px} .grip{min-height:42px}
+}
+@media (max-width:420px){
+  .seats{grid-template-columns:minmax(0,1fr) 26px minmax(0,1fr) minmax(0,1fr); column-gap:6px}
+  .seat svg{width:46px; height:42px} .seat .who{font-size:11.5px}
+  .tools input{width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  .panel.enter,.modal-bg.enter .modal,.seat.flash svg{animation:none}
+  .btn:active,.seg button:active,.x:active,.seats .seat:active svg,.seats .seat.over svg,.seats .seat:hover svg{transform:none}
+  .toast{transition:opacity .2s ease; transform:translate(-50%, 0)}
+}
+</style>
+
+<a class="skip" href="#main">Skip to bus list</a>
+<div class="wrap">
+  <header class="head">
+    <div class="brand"><h1>Marry Holiday</h1><p>Genting bus desk</p></div>
+    <nav id="days" class="seg" aria-label="Choose day"></nav>
+  </header>
+  <section id="demo" class="demo" aria-live="polite" aria-label="Guided demo"></section>
+  <main id="main">
+    <section id="overview" class="card" aria-label="Daily overview"></section>
+    <div id="board"></div>
+  </main>
+</div>
+<div id="panelRoot"></div>
+<div id="modalRoot"></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const D1 = '2026-10-08', D2 = '2026-10-09', DAYS = [D1, D2], TODAY = D2;
+const CAP = 30;
+const BADGE = {same:'back', assigned:'back', staying:'staying', returned:'returned'};
+const LONG = {same:'Going back to KL today', assigned:'Assigned to Return Bus', staying:'Staying in Genting · waiting to confirm', returned:'Returned to KL'};
+const dayName = d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
+const short = d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
+const two = n => String(n).padStart(2, '0');
+const digits = s => String(s).replace(/\D/g, '');
+const ICON_X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const ICON_GRIP = '<svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor" aria-hidden="true"><circle cx="3" cy="4" r="1.7"/><circle cx="9" cy="4" r="1.7"/><circle cx="3" cy="10" r="1.7"/><circle cx="9" cy="10" r="1.7"/><circle cx="3" cy="16" r="1.7"/><circle cx="9" cy="16" r="1.7"/></svg>';
+const ICON_WHEEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M3.5 10.5c3-1.5 14-1.5 17 0M12 14v7"/></svg>';
+// Coach seat seen from above: backrest, cushion, two armrests.
+const chair = (n, cls = '') => `<svg viewBox="0 0 48 44" aria-hidden="true" class="${cls}"><rect class="arm" x="2" y="14" width="8" height="26" rx="3"/><rect class="arm" x="38" y="14" width="8" height="26" rx="3"/><rect class="back" x="9" y="2" width="30" height="27" rx="7"/><rect class="cush" x="8" y="27" width="32" height="14" rx="4"/>${n ? `<text x="24" y="20">${n}</text>` : ''}</svg>`;
+
+// 1 + 2 coach: one seat on the left, two on the right, 10 rows = 30 seats.
+const LAYOUT = Array.from({length:10}, (_, r) => [r * 3 + 1, r * 3 + 2, r * 3 + 3]);
+
+// Sample customers. Bus 01 keeps seat 09 free for Alex, Bus 02 keeps seat 07 free for Daniel; Bus 03 is full.
+const BUS1 = ['Tan Chee Keong','Lim Mei Ling','Wong Jun Hao','Siti Aminah Yusof','Ng Siew Hoon','Rajesh Kumar','Chong Mei Lin','Lee Kah Wei','Nurul Huda Ismail','Ahmad Faizal Rahman','Chan Wai Leong','Priya Menon','Ong Bee Lian','Mohd Hafiz Osman','Teoh Li Ying','Suresh Nair','Khoo Soo Lin','Aisyah Zainal','Low Kok Seng','Kavitha Devi','Goh Hui Min','Zulkifli Hassan','Chew Pei Shan','Ganesh Pillai','Foo Wei Jie','Noraini Abdullah','Liew Chun Hong','Tan Shu Fen','Azman Ibrahim'];
+const BUS2 = ['Cheah Siew Ling','Yap Boon Chye','Nur Aisyah Karim','Goh Chee Keong','Farah Hassan','Kelvin Ong','Vijay Subramaniam','Lau Pei Ling','Hafizah Mohd Noor','Chin Wei Loon','Deepa Raj','Soh Kian Hwa','Amirul Hakim','Tay Siew Kim','Lokman Yusoff','Phang Mei Yee','Ravi Chandran','Koh Jia Hui','Shahrul Nizam','Wee Boon Keat','Meena Rajan','Ho Yoke Lan','Faridah Salleh','Sim Teck Guan','Rohana Jalil','Kuan Chee Meng','Latha Gopal','Ooi Kah Yee','Iskandar Zulkarnain'];
+const BUS3 = ['Lau Kim Hock','Priya Nair','Ong Hui Ling','Hafiz Rahman','Mohd Faizal Hamid','Tan Siew Lan','Wendy Chua','Lim Kok Wai','Saraswathi Devi','Chua Beng Huat','Norhayati Ahmad','Teh Swee Lin','Arun Kumar','Pang Sook Ching','Rosli Mat Zin','Yeoh Kim Seng','Shanti Muthu','Chia Wen Hao','Zainab Othman','Loh Mei Fong','Dinesh Rao','Ang Poh Choo','Khairul Anuar','Seow Li Na','Thiru Selvam','Quek Hock Lye','Mazlina Daud','Heng Siew Cheng','Balakrishnan Nair','Fong Yee Ling'];
+const PREFIX = ['012','016','013','017','019'];
+let phoneNo = 0;
+const nextPhone = () => { const n = String(2104417 + phoneNo * 79193); return PREFIX[phoneNo++ % 5] + '-' + n.slice(0, 3) + ' ' + n.slice(3, 7); };
+
+let S;
+
+/* ---------- data ---------- */
+const trip = id => S.trips.find(t => t.id === id);
+const pax = id => S.passengers.find(p => p.id === id);
+const seatAt = (tid, n) => S.bookings.find(b => b.tripId === tid && b.seat === n);
+const goingOf = pid => S.bookings.find(b => b.pid === pid && trip(b.tripId).dir === 'out');
+const backOf = pid => S.bookings.find(b => b.pid === pid && trip(b.tripId).dir === 'ret');
+const onTrip = tid => S.bookings.filter(b => b.tripId === tid);
+const byName = n => S.passengers.find(p => p.name.toLowerCase() === n.toLowerCase());
+const busesOn = d => S.trips.filter(t => t.date === d && t.dir === 'out');
+const busNamed = n => S.trips.find(t => t.bus === n && t.dir === 'out');
+const arrivedOn = p => trip(goingOf(p.id).tripId).date;
+const stayingBy = d => S.passengers.filter(p => p.status === 'staying' && arrivedOn(p) <= d).sort((a, b) => arrivedOn(a).localeCompare(arrivedOn(b)));
+function freeSeat(tid, prefer){
+  if (prefer && prefer <= CAP && !seatAt(tid, prefer)) return prefer;
+  for (let i = 1; i <= CAP; i++) if (!seatAt(tid, i)) return i;
+  return null;
+}
+function nights(p){
+  if (p.status === 'same') return 0;
+  const b = backOf(p.id), start = arrivedOn(p);
+  const end = b ? trip(b.tripId).date : (S.day > start ? S.day : start);
+  return Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 864e5));
+}
+
+/* ---------- actions ---------- */
+let mute = false;
+function toast(m){ if (mute) return; const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 3200); }
+function createTrip(v){
+  const base = {date:v.date, bus:v.bus, plate:v.plate, leader:v.leader, leaderPhone:v.leaderPhone, driver:v.driver, driverPhone:v.driverPhone, done:false};
+  const o = {...base, id:'T' + S.nextTrip++, dir:'out', time:v.out};
+  const r = {...base, id:'T' + S.nextTrip++, dir:'ret', time:v.back};
+  o.pair = r.id; r.pair = o.id;
+  S.trips.push(o, r);
+  return o;
+}
+function register({name, phone, tripId, seat, plan}){
+  const t = trip(tripId);
+  const backSeat = plan === 'same' && !trip(t.pair).done ? freeSeat(t.pair, seat) : null;
+  const p = {id:'P-' + String(S.nextPid++).padStart(4, '0'), name, phone, status:backSeat ? 'same' : 'staying'};
+  S.passengers.push(p);
+  S.bookings.push({pid:p.id, tripId, seat});
+  if (backSeat) S.bookings.push({pid:p.id, tripId:t.pair, seat:backSeat});
+  return p;
+}
+function setStaying(pid){
+  const p = pax(pid), b = backOf(pid);
+  if (p.status === 'returned') { toast(`${p.name} is already back in KL.`); return false; }
+  S.bookings = S.bookings.filter(x => x !== b);
+  p.status = 'staying';
+  toast(`${p.name} is staying in Genting. Return seat released.`);
+  return true;
+}
+function canBack(pid, tid){
+  const p = pax(pid), t = trip(tid);
+  if (!p || !t || t.dir !== 'ret' || t.done || p.status === 'returned') return false;
+  return t.date >= arrivedOn(p);
+}
+function assignBack(pid, tid, seat, quiet){
+  const p = pax(pid), t = trip(tid);
+  if (!canBack(pid, tid)) { toast(p.status === 'returned' ? `${p.name} is already back in KL.` : t.done ? `${t.bus} already arrived in KL.` : `${p.name} cannot take this bus back.`); return false; }
+  if (!seat) { toast(`${t.bus} is full.`); return false; }
+  const occ = seatAt(tid, seat);
+  if (occ && occ.pid !== pid) { toast(`Seat ${two(seat)} is already taken.`); return false; }
+  S.bookings = S.bookings.filter(b => !(b.pid === pid && trip(b.tripId).dir === 'ret'));
+  S.bookings.push({pid, tripId:tid, seat});
+  p.status = tid === trip(goingOf(pid).tripId).pair ? 'same' : 'assigned';
+  S.flash = {tid, seat};
+  if (!quiet) toast(`Booked: ${p.name}, ${t.bus} back to KL, seat ${two(seat)}`);
+  return true;
+}
+function moveSeat(pid, tid, seat){
+  const b = S.bookings.find(x => x.pid === pid && x.tripId === tid);
+  if (!b || seatAt(tid, seat)) return false;
+  b.seat = seat; S.flash = {tid, seat};
+  toast(`${pax(pid).name} moved to seat ${two(seat)}`);
+  return true;
+}
+function arrived(tid){
+  const t = trip(tid); t.done = true;
+  onTrip(tid).forEach(b => pax(b.pid).status = 'returned');
+}
+
+/* ---------- sample data + guided demo ---------- */
+function seed(){
+  S = {step:0, day:D1, bus:null, tab:'out', open:null, flash:null, hold:null, ask:null, filter:'', find:'', nextPid:1, nextTrip:1, trips:[], passengers:[], bookings:[]};
+  phoneNo = 0;
+  const fill = (o, names, skip) => { let seat = 0; names.forEach(name => { seat++; if (seat === skip) seat++; register({name, phone:nextPhone(), tripId:o.id, seat, plan:'same'}); }); };
+  const b1 = createTrip({date:D1, bus:'Bus 01', plate:'WXY 4021', leader:'John Tan', leaderPhone:'012-330 1188', driver:'Lee Chee Seng', driverPhone:'016-772 0431', out:'08:00', back:'17:30'});
+  fill(b1, BUS1, 9);
+  const b2 = createTrip({date:D2, bus:'Bus 02', plate:'VFA 7318', leader:'Jason Lim', leaderPhone:'012-455 9021', driver:'Lim Boon Huat', driverPhone:'017-221 6650', out:'08:30', back:'18:00'});
+  fill(b2, BUS2, 7);
+  const b3 = createTrip({date:D2, bus:'Bus 03', plate:'BKT 5562', leader:'Mary Chen', leaderPhone:'011-3378 2204', driver:'Koh Teck Meng', driverPhone:'019-640 1175', out:'09:00', back:'18:30'});
+  fill(b3, BUS3, 0);
+  S.bus = b1.id;
+}
+const at = (day, busName, tab) => { S.day = day; S.bus = busNamed(busName).id; S.tab = tab; };
+const STEPS = [
+  {text:'<span class="step">Guided demo</span>', run(){ at(D1, 'Bus 01', 'out'); }},
+  {text:'<span class="step">Step 1.</span> Staff add <b>Alex Tan</b> to Going to Genting, last seat 09. Bus 01 is full: 30 of 30. His seat is orange because his return is not confirmed yet.', run(){ at(D1, 'Bus 01', 'out'); if (!byName('Alex Tan')) { const o = busNamed('Bus 01'); register({name:'Alex Tan', phone:'012-718 2290', tripId:o.id, seat:9, plan:'staying'}); S.flash = {tid:o.id, seat:9}; } }},
+  {text:'<span class="step">Step 2.</span> On <b>Back to KL</b>, Alex decides to <b>stay overnight</b>. He stays under <b>Staying in Genting · waiting to confirm</b> and seat 09 on tonight’s bus is left free.', run(){ at(D1, 'Bus 01', 'ret'); const p = byName('Alex Tan'); if (p && p.status === 'same') setStaying(p.id); }},
+  {text:'<span class="step">Step 3.</span> Bus 01 arrives back in KL. The 29 customers on it are <b>Returned</b>. Alex is still in Genting.', run(){ at(D1, 'Bus 01', 'ret'); const o = busNamed('Bus 01'); if (!trip(o.pair).done) arrived(o.pair); }},
+  {text:'<span class="step">Fri 9 Oct (today).</span> Bus 02 and Bus 03 run today. On Back to KL, Alex is still at the top of the list, <b>waiting to confirm</b>, carried over from Thursday.', run(){ at(D2, 'Bus 02', 'ret'); }},
+  {text:'<span class="step">Step 4.</span> Staff add <b>Daniel Lim</b> to Going to Genting, last seat 07. He will stay overnight, so his seat stays orange.', run(){ at(D2, 'Bus 02', 'out'); if (!byName('Daniel Lim')) { const o = busNamed('Bus 02'); register({name:'Daniel Lim', phone:'016-552 0193', tripId:o.id, seat:freeSeat(o.id, 7), plan:'staying'}); S.flash = {tid:o.id, seat:7}; } }},
+  {text:'<span class="step">Step 5.</span> Alex wants to go home. Staff drag Alex onto the free seat on <b>Bus 02 · Back to KL</b>. Press <b>Confirm booking</b> and he goes from orange (waiting) to red (confirmed). No new registration.', run(live){ at(D2, 'Bus 02', 'ret'); const p = byName('Alex Tan'), r = trip(busNamed('Bus 02').pair); if (p && p.status === 'staying') { const n = freeSeat(r.id, 7); if (live) S.ask = {pid:p.id, tid:r.id, seat:n}; else assignBack(p.id, r.id, n, true); } }},
+  {text:'<span class="step">Step 6.</span> Bus 02 arrives in KL. Alex is <b>Returned</b>: up on Bus 01 (Thu), back on Bus 02 (Fri), one record. Daniel is still waiting to confirm.', run(){ at(D2, 'Bus 02', 'ret'); const p = byName('Alex Tan'), o = busNamed('Bus 02'); if (p && p.status === 'staying') assignBack(p.id, o.pair, freeSeat(o.pair, 7), true); if (!trip(o.pair).done) arrived(o.pair); if (p) S.open = p.id; }},
+];
+function goTo(k){ mute = true; seed(); for (let i = 1; i <= k; i++) STEPS[i].run(false); mute = false; if (k === 0) STEPS[0].run(); S.step = k; if (k < 7) S.open = null; S.flash = null; }
+
+/* ---------- render ---------- */
+function renderTop(){
+  $('#days').innerHTML = DAYS.map(d => `<button class="${d === S.day ? 'on' : ''}" aria-pressed="${d === S.day}" data-act="day" data-day="${d}">${dayName(d)}${d === TODAY ? '<small>Today</small>' : ''}</button>`).join('');
+  const last = S.step === STEPS.length - 1;
+  $('#demo').innerHTML = `<p>${STEPS[S.step].text}</p><div class="btns">
+    <button class="btn sm" data-act="prev" ${S.step ? '' : 'disabled'}>Back</button>
+    <button class="btn sm main" data-act="next" ${last ? 'disabled' : ''}>${last ? 'Finished' : 'Next'}</button>
+    <button class="btn sm" data-act="restart">Restart</button></div>`;
+}
+function busStats(o){
+  const up = onTrip(o.id), back = onTrip(o.pair);
+  const staying = up.filter(b => pax(b.pid).status === 'staying').length;
+  const other = up.filter(b => { const bk = backOf(b.pid); return bk && bk.tripId !== o.pair; }).length;
+  const carried = back.filter(b => arrivedOn(pax(b.pid)) < o.date).length;
+  return {up:up.length, staying, other, back:back.length, carried, done:trip(o.pair).done};
+}
+function renderOverview(){
+  const list = busesOn(S.day);
+  const q = S.find.trim().toLowerCase();
+  const shown = list.filter(o => !q || [o.bus, o.plate, o.driver, o.leader].some(v => v.toLowerCase().includes(q)));
+  const st = list.map(busStats);
+  const sum = k => st.reduce((a, s) => a + s[k], 0);
+  const rows = shown.map(o => { const s = busStats(o);
+    return `<tr class="${o.id === S.bus ? 'on' : ''}" data-act="bus" data-trip="${o.id}">
+      <td><b>${esc(o.bus)}</b><small class="mono">${esc(o.plate)}</small></td>
+      <td>${esc(o.leader)}</td>
+      <td>${esc(o.driver)}</td>
+      <td><span class="mono">${o.time} · ${trip(o.pair).time}</span>${s.done ? '<small>Arrived in KL</small>' : ''}</td>
+      <td class="num">${s.up}</td>
+      <td class="num c-stay">${s.staying}</td>
+      <td class="num c-back">${s.back}${s.carried ? `<small>incl. ${s.carried} from earlier day</small>` : ''}</td>
+    </tr>`; }).join('');
+  $('#overview').innerHTML = `
+    <div class="card-head"><h2>Daily overview<span class="sub">${dayName(S.day)}</span></h2>
+      <div class="tools"><input id="find" type="search" placeholder="Search bus, driver or tour leader" value="${esc(S.find)}" aria-label="Search buses"><button class="btn sm" data-act="new-trip">+ Add bus</button></div></div>
+    <dl class="tally">
+      <div><dt>${list.length === 1 ? 'bus' : 'buses'}</dt><dd>${list.length}</dd></div>
+      <div><dt>customers</dt><dd>${sum('up')}</dd></div>
+      <div class="w"><dt>waiting to confirm</dt><dd>${stayingBy(S.day).length}</dd></div>
+      <div class="b"><dt>back to KL</dt><dd>${sum('back')}</dd></div>
+    </dl>
+    ${list.length ? `<div class="table-wrap"><table class="ov">
+      <thead><tr><th>Bus</th><th>Tour leader</th><th>Driver</th><th>Time (up · back)</th><th class="num">Total pax</th><th class="num">Waiting</th><th class="num">Back to KL</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="muted">No bus matches that search.</td></tr>'}</tbody>
+      ${list.length > 1 ? `<tfoot><tr><td>Total (${list.length} buses)</td><td></td><td></td><td></td><td class="num">${sum('up')}</td><td class="num c-stay">${sum('staying')}</td><td class="num c-back">${sum('back')}</td></tr></tfoot>` : ''}
+    </table></div>` : `<div class="empty-day"><b>No bus on ${dayName(S.day)}</b><button class="btn main" data-act="new-trip">+ Add bus</button></div>`}`;
+}
+function rowHTML(p, o, other){
+  const g = trip(goingOf(p.id).tripId), b = backOf(p.id);
+  const sub = other ? `Back on ${esc(trip(b.tripId).bus)} · ${short(trip(b.tripId).date)}` : g.id !== o.id ? `From ${short(g.date)} · ${esc(g.bus)}` : '';
+  const badge = p.status === 'staying' ? '<span class="badge staying">Waiting to confirm</span>' : `<span class="badge ${BADGE[p.status]}">Seat ${two(b.seat)}</span>`;
+  return `<div class="row" data-drag="${p.id}" data-from="" data-act="open" data-pid="${p.id}">
+    <span class="grip" title="Hold and drag">${ICON_GRIP}</span>
+    <div class="rtext"><div class="nm">${esc(p.name)}</div>${sub ? `<div class="meta">${sub}</div>` : ''}</div>
+    ${badge}
+  </div>`;
+}
+// Row for the Going to Genting list: the seat going up, coloured like the seat on the map.
+function goingRowHTML(p, o){
+  const g = goingOf(p.id), b = backOf(p.id);
+  const sub = p.status === 'staying' ? 'Return not confirmed yet' : b && b.tripId !== o.pair ? `Back on ${esc(trip(b.tripId).bus)} · ${short(trip(b.tripId).date)}` : '';
+  return `<div class="row" data-drag="${p.id}" data-from="" data-act="open" data-pid="${p.id}">
+    <span class="grip" title="Hold and drag">${ICON_GRIP}</span>
+    <div class="rtext"><div class="nm">${esc(p.name)}</div>${sub ? `<div class="meta">${sub}</div>` : ''}</div>
+    <span class="badge ${p.status === 'staying' ? 'staying' : 'back'}">Seat ${two(g.seat)}</span>
+  </div>`;
+}
+function seatHTML(t, n){
+  const b = seatAt(t.id, n), h = S.hold;
+  const fl = S.flash && S.flash.tid === t.id && S.flash.seat === n ? ' flash' : '';
+  if (h && h.tid === t.id && h.seat === n) return `<button class="seat hold" data-act="seat" data-trip="${t.id}" data-seat="${n}">${chair(two(n))}<span class="who">${esc(pax(h.pid).name)}</span></button>`;
+  if (!b) return `<button class="seat free${fl}" data-act="seat" data-trip="${t.id}" data-seat="${n}" aria-label="Seat ${n}, free">${chair(two(n))}<span class="who">Free</span></button>`;
+  const p = pax(b.pid);
+  const wait = p.status === 'staying' ? ' hold' : '';
+  return `<button class="seat taken${wait}${fl}" data-act="seat" data-trip="${t.id}" data-seat="${n}" data-drag="${p.id}" data-from="${t.id}" title="${esc(p.name)}" aria-label="Seat ${n}, ${esc(p.name)}">${chair(two(n))}<span class="who">${esc(p.name)}</span></button>`;
+}
+function renderBoard(){
+  const o = trip(S.bus), el = $('#board');
+  if (!o || o.date !== S.day) { el.innerHTML = ''; return; }
+  const r = trip(o.pair), t = S.tab === 'out' ? o : r;
+  const q = S.filter.trim().toLowerCase(), qd = digits(q);
+  const match = p => !q || p.name.toLowerCase().includes(q) || (qd && digits(p.phone).includes(qd));
+  const bySeat = (a, b) => a.seat - b.seat;
+  const goingBack = onTrip(r.id).sort(bySeat).map(b => pax(b.pid)).filter(p => p.status !== 'returned' && match(p));
+  const staying = stayingBy(S.day).filter(match);
+  const returned = onTrip(r.id).sort(bySeat).map(b => pax(b.pid)).filter(p => p.status === 'returned' && match(p));
+  const otherBus = onTrip(o.id).map(b => pax(b.pid)).filter(p => { const bk = backOf(p.id); return bk && bk.tripId !== r.id && match(p); });
+  const goingUp = onTrip(o.id).sort(bySeat).map(b => pax(b.pid)).filter(match);
+  let seats = '';
+  LAYOUT.forEach(row => { seats += seatHTML(t, row[0]) + '<span class="aisle"></span>' + seatHTML(t, row[1]) + seatHTML(t, row[2]); });
+  const tab = (dir, x) => `<button class="${S.tab === dir ? 'on' : ''}" role="tab" aria-selected="${S.tab === dir}" data-act="tab" data-tab="${dir}"><b>${dir === 'out' ? 'Going to Genting' : 'Back to KL'}</b><span>${x.time} · ${onTrip(x.id).length}/${CAP} seats${dir === 'ret' && x.done ? ' · arrived' : ''}</span></button>`;
+  el.innerHTML = `
+  <section class="card" aria-label="Bus details">
+    <div class="card-head"><h2>${esc(o.bus)}<span class="plate">${esc(o.plate)}</span></h2><button class="btn sm" data-act="edit-trip" data-trip="${o.id}">Edit bus details</button></div>
+    <div class="info">
+      <div><span>Driver</span><b>${esc(o.driver)}</b><small class="mono">${esc(o.driverPhone)}</small></div>
+      <div><span>Tour leader</span><b>${esc(o.leader)}</b><small class="mono">${esc(o.leaderPhone)}</small></div>
+      <div><span>Going to Genting</span><b class="mono">${o.time}</b><small>KL → Genting</small></div>
+      <div><span>Back to KL</span><b class="mono">${r.time}</b><small>Genting → KL</small></div>
+    </div>
+  </section>
+  <div class="grid">
+    <section class="card" aria-label="Customers">
+      <div class="card-head"><h2>Customers</h2>${S.tab === 'out'
+        ? `<button class="btn sm" data-act="add" data-trip="${o.id}">+ Add customer</button>`
+        : `<button class="btn sm" data-act="book-back" data-trip="${r.id}" ${r.done ? 'disabled' : ''}>+ Book back to KL</button>`}</div>
+      <div class="search"><input id="filter" type="search" placeholder="Search name or phone" value="${esc(S.filter)}" aria-label="Search customers"></div>
+      ${S.tab === 'out' ? `
+      <div class="group going">
+        <h3><i></i>Going to Genting on ${esc(o.bus)} · ${o.time} (${goingUp.length})</h3>
+        ${goingUp.length ? `<div class="rows tall">${goingUp.map(p => goingRowHTML(p, o)).join('')}</div>` : `<div class="hint">${q ? 'No customer matches that search.' : 'No customers yet. Tap a green seat to add one.'}</div>`}
+      </div>` : `
+      <div class="group staying" data-zone="staying">
+        <h3><i></i>Staying in Genting · waiting to confirm (${staying.length})</h3>
+        ${staying.map(p => rowHTML(p, o)).join('') || '<div class="hint">Nobody is waiting. Drag a customer here if they stay.</div>'}
+      </div>
+      <div class="group back" data-zone="back">
+        <h3><i></i>Going back on ${esc(o.bus)} · ${r.time} (${goingBack.length})</h3>
+        ${goingBack.length ? `<div class="rows">${goingBack.map(p => rowHTML(p, o)).join('')}</div>` : `<div class="hint">${r.done ? 'Bus has arrived in KL.' : 'Drag a customer here to book this bus.'}</div>`}
+      </div>
+      ${returned.length ? `<details class="group returned" ${r.done ? 'open' : ''}><summary><h3><i></i>Returned to KL (${returned.length})</h3></summary><div class="rows">${returned.map(p => rowHTML(p, o)).join('')}</div></details>` : ''}
+      ${otherBus.length ? `<div class="group returned"><h3><i></i>Back on another bus (${otherBus.length})</h3>${otherBus.map(p => rowHTML(p, o, true)).join('')}</div>` : ''}`}
+    </section>
+    <section class="card" aria-label="Seat map">
+      <div class="tabs" role="tablist">${tab('out', o)}${tab('ret', r)}</div>
+      <div class="map">
+        <div class="legend">
+          <span><span class="seat free">${chair('')}</span>Free</span>
+          <span><span class="seat hold">${chair('')}</span>Waiting to confirm</span>
+          <span><span class="seat taken">${chair('')}</span>Taken</span>
+        </div>
+        <div class="coach">
+          <div class="cab"><span class="door-f">Door</span><span class="drv">${ICON_WHEEL}${esc(o.driver)}</span></div>
+          <div class="seats">${seats}</div>
+        </div>
+        ${S.tab === 'ret' ? `<div class="map-foot">${r.done ? '<span class="done">Arrived in KL</span>' : `<button class="btn main" data-act="arrived" data-trip="${r.id}" ${onTrip(r.id).length ? '' : 'disabled'}>Bus arrived in KL</button>`}</div>` : ''}
+      </div>
+    </section>
+  </div>`;
+}
+function renderPanel(){
+  const p = S.open && pax(S.open), root = $('#panelRoot');
+  if (!p) { root.innerHTML = ''; renderPanel.last = null; return; }
+  const enter = renderPanel.last === p.id ? '' : ' enter'; renderPanel.last = p.id;
+  const g = goingOf(p.id), gt = trip(g.tripId), b = backOf(p.id), bt = b && trip(b.tripId), n = nights(p);
+  const back = bt ? `<tr><td>Back to KL</td><td>${short(bt.date)}<br>${bt.time}</td><td>${esc(bt.bus)}</td><td>${two(b.seat)}</td></tr>` : `<tr><td>Back to KL</td><td colspan="3" class="muted">No seat yet</td></tr>`;
+  const cur = trip(S.bus);
+  let acts = '';
+  if (p.status === 'same' || p.status === 'assigned') acts += `<button class="btn" data-act="stay" data-pid="${p.id}">Staying in Genting</button>`;
+  if (p.status === 'staying' && cur && canBack(p.id, cur.pair)) acts += `<button class="btn main" data-act="sendback" data-pid="${p.id}">Book back on ${esc(cur.bus)} · ${short(cur.date)} ${trip(cur.pair).time}</button>`;
+  if (p.status !== 'returned') acts += `<button class="btn" data-act="assign" data-pid="${p.id}">${b ? 'Change return seat' : 'Assign to Return Trip'}</button>`;
+  root.innerHTML = `<div class="shade${enter}" data-act="close"></div>
+  <aside class="panel${enter}" role="dialog" aria-modal="true" aria-labelledby="pName">
+    <div class="panel-top"><div><h2 id="pName">${esc(p.name)}</h2><p class="mono">${esc(p.phone)}</p></div><button class="x" data-act="close" aria-label="Close">${ICON_X}</button></div>
+    <div class="panel-body">
+      <div><span class="badge lg ${BADGE[p.status]}">${LONG[p.status]}</span>${n ? `<span class="meta nights">${n} night${n > 1 ? 's' : ''} in Genting</span>` : ''}</div>
+      <table class="hist"><thead><tr><th>Trip</th><th>When</th><th>Bus</th><th>Seat</th></tr></thead>
+      <tbody><tr><td>Going</td><td>${short(gt.date)}<br>${gt.time}</td><td>${esc(gt.bus)}</td><td>${two(g.seat)}</td></tr>${back}</tbody></table>
+      ${bt && bt.id !== gt.pair ? `<div class="note">One customer record for both trips. ${esc(p.name)} was not registered again.</div>` : ''}
+      ${acts ? `<div class="stack">${acts}</div>` : ''}
+    </div>
+  </aside>`;
+}
+function render(){ renderTop(); renderOverview(); renderBoard(); renderPanel(); S.flash = null; }
+
+/* ---------- forms ---------- */
+function modal(title, body){
+  $('#modalRoot').innerHTML = `<div class="modal-bg enter" data-act="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mT"><div class="modal-top"><h2 id="mT">${title}</h2><button class="x" data-act="modal-close" aria-label="Close">${ICON_X}</button></div>${body}</div></div>`;
+  const f = $('#modalRoot').querySelector('input:not([type=radio]), select, .btn.main'); if (f) f.focus();
+}
+function closeModal(){ $('#modalRoot').innerHTML = ''; if (S.hold) { S.hold = null; render(); } }
+const seatList = (tid, pick) => { let h = ''; for (let i = 1; i <= CAP; i++) if (!seatAt(tid, i)) h += `<option value="${i}" ${i === pick ? 'selected' : ''}>Seat ${two(i)}</option>`; return h || '<option value="">Bus is full</option>'; };
+
+function askConfirm(pid, tid, seat){
+  const p = pax(pid), t = trip(tid);
+  if (!seat) { toast(`${t.bus} is full.`); return; }
+  S.hold = {pid, tid, seat};
+  if (trip(S.bus) && trip(S.bus).pair === tid) S.tab = 'ret';
+  render();
+  modal('Confirm return booking', `<form id="confirmForm">
+    <div class="confirm-box"><span>Customer</span><b>${esc(p.name)}</b><span>Bus</span><b>${esc(t.bus)} · ${esc(t.plate)}</b><span>Trip</span><b>Back to KL · ${short(t.date)} ${t.time}</b><span>Seat</span><b>${two(seat)}</b></div>
+    <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main">Confirm booking</button></div>
+  </form>`);
+}
+function addForm(tid, n){
+  const t = trip(tid);
+  if (!freeSeat(tid)) { toast(`${t.bus} is full going to Genting.`); return; }
+  modal(`Add customer · ${esc(t.bus)} going to Genting`, `<form id="addForm" data-trip="${tid}" novalidate>
+    <label>Name<input id="fName" autocomplete="off"></label>
+    <label>Phone<input id="fPhone" autocomplete="off" inputmode="tel"></label>
+    <div id="dup"></div>
+    <label>Seat going to Genting<select id="fSeat">${seatList(tid, freeSeat(tid, n))}</select></label>
+    <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main" id="fSave">Add to Going to Genting</button></div>
+  </form>`);
+}
+// Back to KL tab: book one of the waiting customers onto this return bus.
+function backForm(tid, n){
+  const t = trip(tid);
+  if (t.done) { toast(`${t.bus} already arrived in KL.`); return; }
+  if (!freeSeat(tid)) { toast(`${t.bus} is full going back to KL.`); return; }
+  const who = stayingBy(t.date).filter(p => canBack(p.id, tid));
+  if (!who.length) { toast('Nobody is waiting to confirm.'); return; }
+  modal(`Book back to KL · ${esc(t.bus)}`, `<form id="backForm" data-trip="${tid}">
+    <label>Customer<select id="bWho">${who.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+    <label>Seat back to KL<select id="bSeat">${seatList(tid, freeSeat(tid, n))}</select></label>
+    <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main">Confirm booking</button></div>
+  </form>`);
+}
+function checkDup(){
+  const nm = $('#fName').value.trim().toLowerCase(), ph = digits($('#fPhone').value);
+  const hit = (ph.length >= 7 && S.passengers.find(p => digits(p.phone) === ph)) || (nm && S.passengers.find(p => p.name.toLowerCase() === nm));
+  $('#dup').innerHTML = hit ? `<div class="msg"><span><b>${esc(hit.name)}</b> (${esc(hit.phone)}) is already a customer. No need to add again.</span><button type="button" class="btn sm" data-act="open" data-pid="${hit.id}">Open ${esc(hit.name)}</button></div>` : '';
+  $('#fSave').disabled = !!hit;
+}
+function assignForm(pid){
+  const p = pax(pid);
+  const opts = S.trips.filter(t => canBack(pid, t.id)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  if (!opts.length) { modal('Assign to Return Trip', `<form><div class="msg">No bus back to KL is available yet. Add a bus first.</div><div class="foot"><button type="button" class="btn" data-act="modal-close">Close</button><button type="button" class="btn main" data-act="new-trip">+ Add bus</button></div></form>`); return; }
+  const def = opts.find(t => t.id === trip(S.bus)?.pair) || opts.find(t => t.date === S.day) || opts[0];
+  modal(`Assign ${esc(p.name)} to Return Trip`, `<form id="assignForm" data-pid="${pid}">
+    <label>Bus back to KL<select id="aTrip">${opts.map(t => `<option value="${t.id}" ${t === def ? 'selected' : ''}>${short(t.date)} · ${esc(t.bus)} · ${t.time}</option>`).join('')}</select></label>
+    <label>Seat<select id="aSeat">${seatList(def.id, freeSeat(def.id))}</select></label>
+    <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main">Confirm booking</button></div>
+  </form>`);
+}
+function tripForm(editId){
+  const e = editId && trip(editId);
+  let k = 1; const used = busesOn(S.day).map(t => t.bus); while (used.includes('Bus ' + two(k))) k++;
+  const v = e || {date:S.day, bus:'Bus ' + two(k), plate:'', leader:'', leaderPhone:'', driver:'', driverPhone:'', time:'09:00'};
+  const backTime = e ? trip(e.pair).time : '18:30';
+  modal(e ? `Edit ${esc(e.bus)}` : 'Add bus', `<form id="tripForm" data-edit="${e ? e.id : ''}" novalidate>
+    <div class="two"><label>Day<select id="tDay" ${e ? 'disabled' : ''}>${DAYS.map(d => `<option value="${d}" ${d === v.date ? 'selected' : ''}>${dayName(d)}</option>`).join('')}</select></label><label>Bus number<input id="tBus" value="${esc(v.bus)}"></label></div>
+    <label>Vehicle plate<input id="tPlate" value="${esc(v.plate)}" placeholder="e.g. WXY 4021"></label>
+    <div class="sep">Driver</div>
+    <div class="two"><label>Name<input id="tDriver" value="${esc(v.driver)}"></label><label>Phone<input id="tDriverPhone" value="${esc(v.driverPhone)}" inputmode="tel"></label></div>
+    <div class="sep">Tour leader</div>
+    <div class="two"><label>Name<input id="tLeader" value="${esc(v.leader)}"></label><label>Phone<input id="tLeaderPhone" value="${esc(v.leaderPhone)}" inputmode="tel"></label></div>
+    <div class="sep">Times</div>
+    <div class="two"><label>Leave KL<input id="tOut" type="time" value="${v.time}"></label><label>Leave Genting<input id="tBack" type="time" value="${backTime}"></label></div>
+    <div id="tErr"></div>
+    <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main">Save bus</button></div>
+  </form>`);
+}
+
+/* ---------- events ---------- */
+let skipClick = false;
+document.addEventListener('click', e => {
+  if (skipClick) { skipClick = false; e.preventDefault(); return; }
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, pid = el.dataset.pid;
+  switch (a) {
+    case 'next':
+      if (S.step < STEPS.length - 1) { S.open = null; S.step++; STEPS[S.step].run(true); render(); if (S.ask) { const q = S.ask; S.ask = null; askConfirm(q.pid, q.tid, q.seat); } }
+      return;
+    case 'prev': goTo(S.step - 1); break;
+    case 'restart': goTo(0); break;
+    case 'day': S.day = el.dataset.day; S.bus = (busesOn(S.day)[0] || {}).id || null; S.tab = 'out'; S.filter = ''; break;
+    case 'bus': S.bus = el.dataset.trip; break;
+    case 'tab': S.tab = el.dataset.tab; break;
+    case 'open': $('#modalRoot').innerHTML = ''; S.hold = null; S.open = pid; break;
+    case 'close': S.open = null; break;
+    case 'stay': setStaying(pid); break;
+    case 'sendback': { const r = trip(trip(S.bus).pair); S.open = null; S.tab = 'ret'; askConfirm(pid, r.id, freeSeat(r.id, goingOf(pid).seat)); return; }
+    case 'assign': assignForm(pid); return;
+    case 'arrived': arrived(el.dataset.trip); toast(`${trip(el.dataset.trip).bus} arrived in KL. Customers marked Returned.`); break;
+    case 'add': addForm(el.dataset.trip); return;
+    case 'book-back': backForm(el.dataset.trip); return;
+    case 'new-trip': tripForm(); return;
+    case 'edit-trip': tripForm(el.dataset.trip); return;
+    case 'modal-close': closeModal(); return;
+    case 'modal-bg': if (e.target === el) closeModal(); return;
+    case 'seat': {
+      const t = trip(el.dataset.trip), n = +el.dataset.seat, b = seatAt(t.id, n);
+      if (b) { S.open = b.pid; break; }
+      if (S.hold) return;
+      if (t.dir === 'out') { addForm(t.id, n); return; }
+      backForm(t.id, n);
+      return;
+    }
+    default: return;
+  }
+  render();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('#modalRoot').innerHTML) closeModal(); else if (S.open) { S.open = null; render(); }
+});
+document.addEventListener('input', e => {
+  const id = e.target.id;
+  if (id === 'fName' || id === 'fPhone') checkDup();
+  if (id === 'filter' || id === 'find') {
+    if (id === 'filter') { S.filter = e.target.value; renderBoard(); } else { S.find = e.target.value; renderOverview(); }
+    const f = document.getElementById(id); f.focus(); f.setSelectionRange(f.value.length, f.value.length);
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'aTrip') $('#aSeat').innerHTML = seatList(e.target.value, freeSeat(e.target.value)); });
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.id === 'confirmForm') {
+    const h = S.hold; S.hold = null; $('#modalRoot').innerHTML = '';
+    if (h && assignBack(h.pid, h.tid, h.seat)) { S.tab = 'ret'; }
+    render();
+  }
+  if (f.id === 'addForm') {
+    const name = $('#fName').value.trim(), phone = $('#fPhone').value.trim(), n = +$('#fSeat').value;
+    if (!name || !phone) { $('#dup').innerHTML = '<div class="msg">Please fill in name and phone.</div>'; return; }
+    if (!n) return;
+    const p = register({name, phone, tripId:f.dataset.trip, seat:n, plan:'staying'});
+    S.flash = {tid:f.dataset.trip, seat:n}; S.tab = 'out'; $('#modalRoot').innerHTML = ''; toast(`${p.name} added to Going to Genting, seat ${two(n)}`); render();
+  }
+  if (f.id === 'backForm') {
+    const n = +$('#bSeat').value;
+    if (n && assignBack($('#bWho').value, f.dataset.trip, n)) { S.tab = 'ret'; $('#modalRoot').innerHTML = ''; render(); }
+  }
+  if (f.id === 'assignForm') {
+    const tid = $('#aTrip').value, n = +$('#aSeat').value;
+    if (n && assignBack(f.dataset.pid, tid, n)) { const t = trip(tid); S.day = t.date; S.bus = t.pair; S.tab = 'ret'; S.open = null; $('#modalRoot').innerHTML = ''; render(); }
+  }
+  if (f.id === 'tripForm') {
+    const v = id => $(id).value.trim();
+    const edit = f.dataset.edit && trip(f.dataset.edit);
+    const day = edit ? edit.date : v('#tDay'), name = v('#tBus');
+    if (!name || !v('#tDriver') || !v('#tLeader')) { $('#tErr').innerHTML = '<div class="msg">Please fill in bus number, driver and tour leader.</div>'; return; }
+    if (S.trips.some(t => t.date === day && t.bus.toLowerCase() === name.toLowerCase() && (!edit || (t.id !== edit.id && t.id !== edit.pair)))) { $('#tErr').innerHTML = `<div class="msg">${esc(name)} already runs on ${dayName(day)}.</div>`; return; }
+    const vals = {bus:name, plate:v('#tPlate') || '-', driver:v('#tDriver'), driverPhone:v('#tDriverPhone') || '-', leader:v('#tLeader'), leaderPhone:v('#tLeaderPhone') || '-'};
+    if (edit) { Object.assign(edit, vals, {time:v('#tOut') || edit.time}); Object.assign(trip(edit.pair), vals, {time:v('#tBack') || trip(edit.pair).time}); toast(`${name} updated`); }
+    else { const o = createTrip({...vals, date:day, out:v('#tOut') || '09:00', back:v('#tBack') || '18:30'}); S.day = day; S.bus = o.id; S.tab = 'out'; toast(`${name} added`); }
+    $('#modalRoot').innerHTML = ''; render();
+  }
+});
+
+/* ---------- drag and drop (mouse + touch) ----------
+   Drag a customer (list row, or a red seat) onto:
+   - a green seat on "Back to KL"       -> orange, then Confirm booking -> red
+   - a green seat on the same trip      -> change seat
+   - "Going back on Bus xx" box         -> same, next free seat
+   - "Staying in Genting" box           -> return seat released */
+let drag = null;
+function targetOk(d, el){
+  const p = pax(d.pid), cur = trip(S.bus);
+  if (el.dataset.zone === 'staying') return p.status === 'same' || p.status === 'assigned';
+  if (el.dataset.zone === 'back') return !!cur && canBack(d.pid, cur.pair) && backOf(d.pid)?.tripId !== cur.pair;
+  if (!el.classList.contains('free')) return false;
+  const tid = el.dataset.trip, t = trip(tid);
+  if (tid === d.from) return true;
+  return t.dir === 'ret' ? canBack(d.pid, tid) : goingOf(d.pid).tripId === tid;
+}
+function endDrag(){
+  if (!drag) return;
+  drag.ghost?.remove();
+  document.body.classList.remove('dragging');
+  document.querySelectorAll('.ok, .over, .src').forEach(s => s.classList.remove('ok', 'over', 'src'));
+  drag = null;
+}
+document.addEventListener('pointerdown', e => {
+  const src = e.target.closest('[data-drag]');
+  if (!src || e.button > 0 || S.hold) return;
+  if (drag) { if (drag.on && e.pointerId !== drag.id) return; endDrag(); }
+  if (e.pointerType !== 'mouse' && src.classList.contains('row') && !e.target.closest('.grip')) return;
+  drag = {pid:src.dataset.drag, from:src.dataset.from, x:e.clientX, y:e.clientY, on:false, over:null, id:e.pointerId, src};
+});
+document.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.on) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+    drag.on = true;
+    drag.ghost = Object.assign(document.createElement('div'), {className:'ghost', textContent:pax(drag.pid).name});
+    document.body.appendChild(drag.ghost);
+    document.body.classList.add('dragging');
+    drag.src.classList.add('src');
+    document.querySelectorAll('.seats .seat.free, [data-zone]').forEach(s => { if (targetOk(drag, s)) s.classList.add('ok'); });
+  }
+  e.preventDefault();
+  drag.ghost.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -135%) rotate(-2deg)`;
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const t = hit && (hit.closest('.seats .seat') || hit.closest('[data-zone]'));
+  if (drag.over && drag.over !== t) drag.over.classList.remove('over');
+  drag.over = t && t.classList.contains('ok') ? t : null;
+  if (drag.over) drag.over.classList.add('over');
+  if (e.clientY < 70) scrollBy(0, -14); else if (e.clientY > innerHeight - 70) scrollBy(0, 14);
+});
+document.addEventListener('pointerup', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.on) { drag = null; return; }
+  skipClick = true; setTimeout(() => skipClick = false, 0);
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const t = hit && (hit.closest('.seats .seat') || hit.closest('[data-zone]')), d = drag;
+  const ok = t && targetOk(d, t);
+  endDrag();
+  if (!t) return;
+  if (t.dataset.zone === 'staying') { if (ok) { setStaying(d.pid); render(); } return; }
+  if (t.dataset.zone === 'back') { if (ok) { const r = trip(trip(S.bus).pair); askConfirm(d.pid, r.id, freeSeat(r.id, goingOf(d.pid).seat)); } return; }
+  const tid = t.dataset.trip, n = +t.dataset.seat, tt = trip(tid);
+  if (!t.classList.contains('free')) { if (seatAt(tid, n)?.pid !== d.pid) toast(`Seat ${two(n)} is already taken.`); return; }
+  if (tid === d.from) { moveSeat(d.pid, tid, n); render(); return; }
+  if (tt.dir === 'ret') { if (ok) askConfirm(d.pid, tid, n); else canBack(d.pid, tid) || toast(`${pax(d.pid).name} cannot take this bus back.`); return; }
+  if (goingOf(d.pid).tripId === tid) { moveSeat(d.pid, tid, n); render(); return; }
+  toast(`${pax(d.pid).name} did not ride ${tt.bus} up. Use the Back to KL tab.`);
+});
+document.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) endDrag(); });
+window.addEventListener('blur', endDrag);
+document.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('[data-drag]')) e.preventDefault(); });
+
+goTo(0); render();
+</script>
+
+</body>
+</html>
