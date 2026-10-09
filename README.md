@@ -1,4 +1,4 @@
-﻿# Marry Holiday — Genting Tour Operations Console
+# Marry Holiday — Genting Tour Operations Console
 
 A lightweight, browser-based operations management console developed for Marry Holiday to oversee Genting tour coach bookings, passenger manifests, schedule coordination, and real-time seat allocations.
 
@@ -14,6 +14,7 @@ The Genting Tour Operations Console provides front-desk and transport dispatch t
 
 - **Daily Operations Overview**: Real-time aggregation of booking totals, coach utilization metrics, departure timelines, and passenger tallies.
 - **Interactive Coach Seating Matrix**: Visual 30-seat floor plan reflecting standard 1+2 VIP coach configurations with status-coded seat allocations (Available, Reserved, Checked-In).
+- **Cancellation Management & Instant Seat Release**: Seamlessly process last-minute client cancellations or no-shows, immediately releasing coach seats back to free inventory for re-booking while logging full cancellation records with reasons and timestamps.
 - **Passenger Manifest Management**: Searchable customer rosters with booking references, contact numbers, pickup points, and trip verification tools.
 - **Client-Side Architecture**: Fully functional static application with zero backend runtime dependencies, ready for offline local use or static cloud hosting.
 

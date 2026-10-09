@@ -21,6 +21,7 @@
   --ok:#1e7d3c; --ok-deep:#17662f; --ok-soft:#e7f4eb;
   --wait:#e5952a; --wait-deep:#b6720f; --wait-ink:#7a4a00; --wait-soft:#fdf1dd;
   --no:#c9382b; --no-deep:#a32a20; --no-soft:#fbe9e7;
+  --cancel:#b91c1c; --cancel-deep:#991b1b; --cancel-soft:#fef2f2; --cancel-border:#fecaca;
   --on-ink:#ffffff; --on-wait:#2b1a00;
   --font:'Geist', 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
   --mono:'Geist Mono', ui-monospace, 'SF Mono', Consolas, 'Courier New', monospace;
@@ -66,6 +67,8 @@ h1,h2,h3{margin:0; font-weight:600; letter-spacing:-.012em}
 .btn.main{background:var(--ink); border-color:var(--ink); color:var(--on-ink)}
 .btn.sm{min-height:34px; padding:0 12px; font-size:14px}
 .btn:disabled{opacity:.38; cursor:not-allowed; transform:none}
+.btn.danger{color:var(--cancel-deep); border-color:var(--cancel-border); background:var(--bg)}
+.btn.danger-fill{background:var(--cancel); border-color:var(--cancel); color:#ffffff}
 
 /* Containers */
 .card{border:1px solid var(--line); border-radius:var(--r-lg); background:var(--bg); min-width:0}
@@ -85,6 +88,8 @@ h1,h2,h3{margin:0; font-weight:600; letter-spacing:-.012em}
 .tally dd{margin:0; font:600 22px/1 var(--mono); letter-spacing:-.03em}
 .tally .w dt::before,.tally .b dt::before{content:""; display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; background:var(--wait)}
 .tally .b dt::before{background:var(--no)}
+.tally .c-cancel dt::before{content:""; display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; background:var(--cancel)}
+.tally .c-cancel dd{color:var(--cancel-deep)}
 .table-wrap{overflow-x:auto; border-top:1px solid var(--line)}
 table.ov{width:100%; border-collapse:collapse; min-width:620px}
 .ov th{font-size:13px; color:var(--muted); font-weight:500; text-align:left; padding:9px 16px; border-bottom:1px solid var(--line)}
@@ -125,6 +130,7 @@ table.ov{width:100%; border-collapse:collapse; min-width:620px}
 .group.staying h3 i{background:var(--wait)}
 .group.returned h3 i{background:var(--faint)}
 .group.going h3 i{background:var(--ink)}
+.group.cancelled h3 i{background:var(--cancel)}
 .rows{max-height:520px; overflow-y:auto; overscroll-behavior:contain}
 .rows.tall{max-height:760px}
 .group .hint{font-size:14px; color:var(--muted); padding:6px}
@@ -141,6 +147,7 @@ table.ov{width:100%; border-collapse:collapse; min-width:620px}
 .badge.back{background:var(--no-soft); color:var(--no-deep)}
 .badge.staying{background:var(--wait-soft); color:var(--wait-ink)}
 .badge.returned{background:var(--soft-2); color:var(--muted)}
+.badge.cancelled{background:var(--cancel-soft); color:var(--cancel-deep); border:1px solid var(--cancel-border)}
 .badge.lg{font-size:14px; padding:7px 10px; display:inline-block}
 .nights{margin-left:8px}
 details.group summary{cursor:pointer; list-style:none}
@@ -206,6 +213,16 @@ table.hist{width:100%; border-collapse:collapse}
 .hist th{color:var(--muted); font-weight:500; font-size:13px}
 .hist tbody tr:last-child td{border-bottom:0}
 .note{background:var(--ok-soft); color:var(--ok-deep); border-radius:var(--r-md); padding:10px 12px; font-size:14px}
+.cancel-card{background:var(--cancel-soft); border:1px solid var(--cancel-border); color:var(--cancel-deep); border-radius:var(--r-md); padding:12px 14px; font-size:14px; display:flex; flex-direction:column; gap:6px}
+.cancel-card b{color:var(--cancel-deep)}
+.row-cancel .nm del{color:var(--muted)}
+.cancel-icon{width:20px; height:20px; display:grid; place-items:center; border-radius:50%; background:var(--cancel-soft); color:var(--cancel-deep); font-size:11px; font-weight:700; flex:none}
+table.cancel-tbl{width:100%; border-collapse:collapse; min-width:580px}
+.cancel-tbl th{font-size:13px; color:var(--muted); font-weight:500; text-align:left; padding:9px 12px; border-bottom:1px solid var(--line)}
+.cancel-tbl td{padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:middle}
+.cancel-tbl tbody tr:last-child td{border-bottom:0}
+.cancel-tbl tbody tr:hover{background:var(--soft)}
+.modal.lg{width:min(720px, 100%)}
 .stack{display:flex; flex-direction:column; gap:8px}
 
 /* Forms */
@@ -248,6 +265,8 @@ table.hist{width:100%; border-collapse:collapse}
 @media (hover:hover) and (pointer:fine){
   .btn:hover{background:var(--soft)}
   .btn.main:hover{background:var(--ink-2); border-color:var(--ink-2)}
+  .btn.danger:hover{background:var(--cancel-soft); border-color:var(--cancel)}
+  .btn.danger-fill:hover{background:var(--cancel-deep); border-color:var(--cancel-deep)}
   .btn:disabled:hover{background:var(--bg)}
   .btn.main:disabled:hover{background:var(--ink); border-color:var(--ink)}
   .seg button:not(.on):hover{color:var(--ink)}
@@ -294,8 +313,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const D1 = '2026-10-08', D2 = '2026-10-09', DAYS = [D1, D2], TODAY = D2;
 const CAP = 30;
-const BADGE = {same:'back', assigned:'back', staying:'staying', returned:'returned'};
-const LONG = {same:'Going back to KL today', assigned:'Assigned to Return Bus', staying:'Staying in Genting · waiting to confirm', returned:'Returned to KL'};
+const BADGE = {same:'back', assigned:'back', staying:'staying', returned:'returned', cancelled:'cancelled'};
+const LONG = {same:'Going back to KL today', assigned:'Assigned to Return Bus', staying:'Staying in Genting · waiting to confirm', returned:'Returned to KL', cancelled:'Booking Cancelled · Seat Released'};
 const dayName = d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 const short = d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 const two = n => String(n).padStart(2, '0');
@@ -329,15 +348,21 @@ const onTrip = tid => S.bookings.filter(b => b.tripId === tid);
 const byName = n => S.passengers.find(p => p.name.toLowerCase() === n.toLowerCase());
 const busesOn = d => S.trips.filter(t => t.date === d && t.dir === 'out');
 const busNamed = n => S.trips.find(t => t.bus === n && t.dir === 'out');
-const arrivedOn = p => trip(goingOf(p.id).tripId).date;
+const arrivedOn = p => {
+  const g = goingOf(p.id);
+  if (g) return trip(g.tripId).date;
+  const c = (S.cancellations || []).find(x => x.pid === p.id);
+  return c ? c.date : S.day;
+};
 const stayingBy = d => S.passengers.filter(p => p.status === 'staying' && arrivedOn(p) <= d).sort((a, b) => arrivedOn(a).localeCompare(arrivedOn(b)));
+const cancellationsOn = d => (S.cancellations || []).filter(c => c.date === d);
 function freeSeat(tid, prefer){
   if (prefer && prefer <= CAP && !seatAt(tid, prefer)) return prefer;
   for (let i = 1; i <= CAP; i++) if (!seatAt(tid, i)) return i;
   return null;
 }
 function nights(p){
-  if (p.status === 'same') return 0;
+  if (p.status === 'same' || p.status === 'cancelled') return 0;
   const b = backOf(p.id), start = arrivedOn(p);
   const end = b ? trip(b.tripId).date : (S.day > start ? S.day : start);
   return Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 864e5));
@@ -384,7 +409,8 @@ function assignBack(pid, tid, seat, quiet){
   if (occ && occ.pid !== pid) { toast(`Seat ${two(seat)} is already taken.`); return false; }
   S.bookings = S.bookings.filter(b => !(b.pid === pid && trip(b.tripId).dir === 'ret'));
   S.bookings.push({pid, tripId:tid, seat});
-  p.status = tid === trip(goingOf(pid).tripId).pair ? 'same' : 'assigned';
+  const g = goingOf(pid);
+  p.status = (g && tid === trip(g.tripId).pair) ? 'same' : 'assigned';
   S.flash = {tid, seat};
   if (!quiet) toast(`Booked: ${p.name}, ${t.bus} back to KL, seat ${two(seat)}`);
   return true;
@@ -396,6 +422,67 @@ function moveSeat(pid, tid, seat){
   toast(`${pax(pid).name} moved to seat ${two(seat)}`);
   return true;
 }
+function cancelBooking({pid, scope = 'all', reason = 'Client suddenly cannot make it'}){
+  const p = pax(pid);
+  if (!p) return false;
+  const g = goingOf(pid), b = backOf(pid);
+  const curBus = trip(S.bus);
+  const freed = [];
+  
+  if ((scope === 'all' || scope === 'out') && g) {
+    S.bookings = S.bookings.filter(x => x !== g);
+    freed.push({tripId: g.tripId, seat: g.seat, dir: 'out'});
+  }
+  if ((scope === 'all' || scope === 'ret') && b) {
+    S.bookings = S.bookings.filter(x => x !== b);
+    freed.push({tripId: b.tripId, seat: b.seat, dir: 'ret'});
+  }
+  
+  const hasRemaining = S.bookings.some(x => x.pid === pid);
+  if (!hasRemaining || scope === 'all') {
+    p.status = 'cancelled';
+  } else if (p.status === 'same' && !b) {
+    p.status = 'staying';
+  }
+  
+  const refTrip = (g && trip(g.tripId)) || (b && trip(b.tripId)) || curBus;
+  const outT = g ? trip(g.tripId) : null;
+  const retT = b ? trip(b.tripId) : null;
+  
+  const rec = {
+    id: 'CN-' + String(S.nextCid++).padStart(4, '0'),
+    pid: p.id,
+    name: p.name,
+    phone: p.phone,
+    date: refTrip ? refTrip.date : S.day,
+    busId: refTrip ? refTrip.id : null,
+    busName: refTrip ? refTrip.bus : 'Genting Coach',
+    plate: refTrip ? refTrip.plate : '-',
+    dir: scope,
+    outTripId: g?.tripId || null,
+    outBus: outT ? outT.bus : null,
+    outSeat: g?.seat || null,
+    retTripId: b?.tripId || null,
+    retBus: retT ? retT.bus : null,
+    retSeat: b?.seat || null,
+    seat: g?.seat || b?.seat || null,
+    freed,
+    reason,
+    cancelledAt: new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) + ', ' + short(refTrip ? refTrip.date : S.day),
+  };
+  
+  if (!S.cancellations) S.cancellations = [];
+  S.cancellations.unshift(rec);
+  
+  // Flash freed seat on coach map if currently viewing that bus & tab
+  const activeTid = S.tab === 'out' ? S.bus : trip(S.bus)?.pair;
+  const activeFreed = freed.find(f => f.tripId === activeTid);
+  if (activeFreed) S.flash = {tid: activeTid, seat: activeFreed.seat};
+  
+  const freedDesc = freed.map(f => `${trip(f.tripId).bus} Seat ${two(f.seat)}`).join(' & ');
+  toast(`${p.name}'s booking cancelled. ${freedDesc ? freedDesc + ' released.' : 'Seat released.'}`);
+  return true;
+}
 function arrived(tid){
   const t = trip(tid); t.done = true;
   onTrip(tid).forEach(b => pax(b.pid).status = 'returned');
@@ -403,7 +490,7 @@ function arrived(tid){
 
 /* ---------- sample data + guided demo ---------- */
 function seed(){
-  S = {step:0, day:D1, bus:null, tab:'out', open:null, flash:null, hold:null, ask:null, filter:'', find:'', nextPid:1, nextTrip:1, trips:[], passengers:[], bookings:[]};
+  S = {step:0, day:D1, bus:null, tab:'out', open:null, flash:null, hold:null, ask:null, filter:'', find:'', nextPid:1, nextTrip:1, nextCid:2, trips:[], passengers:[], bookings:[], cancellations:[]};
   phoneNo = 0;
   const fill = (o, names, skip) => { let seat = 0; names.forEach(name => { seat++; if (seat === skip) seat++; register({name, phone:nextPhone(), tripId:o.id, seat, plan:'same'}); }); };
   const b1 = createTrip({date:D1, bus:'Bus 01', plate:'WXY 4021', leader:'John Tan', leaderPhone:'012-330 1188', driver:'Lee Chee Seng', driverPhone:'016-772 0431', out:'08:00', back:'17:30'});
@@ -413,6 +500,30 @@ function seed(){
   const b3 = createTrip({date:D2, bus:'Bus 03', plate:'BKT 5562', leader:'Mary Chen', leaderPhone:'011-3378 2204', driver:'Koh Teck Meng', driverPhone:'019-640 1175', out:'09:00', back:'18:30'});
   fill(b3, BUS3, 0);
   S.bus = b1.id;
+  // Pre-seed sample cancellation on Day 1 (explaining why Seat 09 on Bus 01 was released for Alex Tan in Step 1)
+  S.cancellations = [
+    {
+      id: 'CN-0001',
+      pid: 'P-9999',
+      name: 'David Wong',
+      phone: '012-388 9201',
+      date: D1,
+      busId: b1.id,
+      busName: 'Bus 01',
+      plate: 'WXY 4021',
+      dir: 'all',
+      outTripId: b1.id,
+      outBus: 'Bus 01',
+      outSeat: 9,
+      retTripId: b1.pair,
+      retBus: 'Bus 01',
+      retSeat: 9,
+      seat: 9,
+      freed: [{tripId: b1.id, seat: 9, dir: 'out'}, {tripId: b1.pair, seat: 9, dir: 'ret'}],
+      reason: 'Client suddenly unwell (Fever / Flu)',
+      cancelledAt: '07:30, ' + short(D1)
+    }
+  ];
 }
 const at = (day, busName, tab) => { S.day = day; S.bus = busNamed(busName).id; S.tab = tab; };
 const STEPS = [
@@ -459,14 +570,20 @@ function renderOverview(){
       <td class="num c-stay">${s.staying}</td>
       <td class="num c-back">${s.back}${s.carried ? `<small>incl. ${s.carried} from earlier day</small>` : ''}</td>
     </tr>`; }).join('');
+  const dayCans = cancellationsOn(S.day);
   $('#overview').innerHTML = `
     <div class="card-head"><h2>Daily overview<span class="sub">${dayName(S.day)}</span></h2>
-      <div class="tools"><input id="find" type="search" placeholder="Search bus, driver or tour leader" value="${esc(S.find)}" aria-label="Search buses"><button class="btn sm" data-act="new-trip">+ Add bus</button></div></div>
+      <div class="tools">
+        <input id="find" type="search" placeholder="Search bus, driver or tour leader" value="${esc(S.find)}" aria-label="Search buses">
+        <button class="btn sm" data-act="new-trip">+ Add bus</button>
+        <button class="btn sm" data-act="view-cancellations" title="View cancellation records">Cancellation records (${dayCans.length})</button>
+      </div></div>
     <dl class="tally">
       <div><dt>${list.length === 1 ? 'bus' : 'buses'}</dt><dd>${list.length}</dd></div>
       <div><dt>customers</dt><dd>${sum('up')}</dd></div>
       <div class="w"><dt>waiting to confirm</dt><dd>${stayingBy(S.day).length}</dd></div>
       <div class="b"><dt>back to KL</dt><dd>${sum('back')}</dd></div>
+      <div class="c-cancel"><dt>cancelled</dt><dd>${dayCans.length}</dd></div>
     </dl>
     ${list.length ? `<div class="table-wrap"><table class="ov">
       <thead><tr><th>Bus</th><th>Tour leader</th><th>Driver</th><th>Time (up · back)</th><th class="num">Total pax</th><th class="num">Waiting</th><th class="num">Back to KL</th></tr></thead>
@@ -475,8 +592,8 @@ function renderOverview(){
     </table></div>` : `<div class="empty-day"><b>No bus on ${dayName(S.day)}</b><button class="btn main" data-act="new-trip">+ Add bus</button></div>`}`;
 }
 function rowHTML(p, o, other){
-  const g = trip(goingOf(p.id).tripId), b = backOf(p.id);
-  const sub = other ? `Back on ${esc(trip(b.tripId).bus)} · ${short(trip(b.tripId).date)}` : g.id !== o.id ? `From ${short(g.date)} · ${esc(g.bus)}` : '';
+  const g = goingOf(p.id), b = backOf(p.id);
+  const sub = other ? `Back on ${esc(trip(b.tripId).bus)} · ${short(trip(b.tripId).date)}` : (g && g.id !== o.id ? `From ${short(trip(g.tripId).date)} · ${esc(trip(g.tripId).bus)}` : '');
   const badge = p.status === 'staying' ? '<span class="badge staying">Waiting to confirm</span>' : `<span class="badge ${BADGE[p.status]}">Seat ${two(b.seat)}</span>`;
   return `<div class="row" data-drag="${p.id}" data-from="" data-act="open" data-pid="${p.id}">
     <span class="grip" title="Hold and drag">${ICON_GRIP}</span>
@@ -515,6 +632,7 @@ function renderBoard(){
   const returned = onTrip(r.id).sort(bySeat).map(b => pax(b.pid)).filter(p => p.status === 'returned' && match(p));
   const otherBus = onTrip(o.id).map(b => pax(b.pid)).filter(p => { const bk = backOf(p.id); return bk && bk.tripId !== r.id && match(p); });
   const goingUp = onTrip(o.id).sort(bySeat).map(b => pax(b.pid)).filter(match);
+  const cancelledForBus = (S.cancellations || []).filter(c => (c.busId === o.id || c.outTripId === o.id || c.retTripId === r.id) && match(c));
   let seats = '';
   LAYOUT.forEach(row => { seats += seatHTML(t, row[0]) + '<span class="aisle"></span>' + seatHTML(t, row[1]) + seatHTML(t, row[2]); });
   const tab = (dir, x) => `<button class="${S.tab === dir ? 'on' : ''}" role="tab" aria-selected="${S.tab === dir}" data-act="tab" data-tab="${dir}"><b>${dir === 'out' ? 'Going to Genting' : 'Back to KL'}</b><span>${x.time} · ${onTrip(x.id).length}/${CAP} seats${dir === 'ret' && x.done ? ' · arrived' : ''}</span></button>`;
@@ -549,6 +667,22 @@ function renderBoard(){
       </div>
       ${returned.length ? `<details class="group returned" ${r.done ? 'open' : ''}><summary><h3><i></i>Returned to KL (${returned.length})</h3></summary><div class="rows">${returned.map(p => rowHTML(p, o)).join('')}</div></details>` : ''}
       ${otherBus.length ? `<div class="group returned"><h3><i></i>Back on another bus (${otherBus.length})</h3>${otherBus.map(p => rowHTML(p, o, true)).join('')}</div>` : ''}`}
+      ${cancelledForBus.length ? `
+      <details class="group cancelled" open>
+        <summary><h3><i></i>Cancelled · Did not go (${cancelledForBus.length})</h3></summary>
+        <div class="rows">
+          ${cancelledForBus.map(c => `
+            <div class="row row-cancel" data-act="open-cancel" data-cid="${c.id}" title="Click to view cancellation details">
+              <span class="cancel-icon">✕</span>
+              <div class="rtext">
+                <div class="nm"><del>${esc(c.name)}</del></div>
+                <div class="meta">${esc(c.reason)} · <span class="mono">${c.cancelledAt}</span></div>
+              </div>
+              <span class="badge cancelled">${c.outSeat && c.retSeat ? `Seats ${two(c.outSeat)} & ${two(c.retSeat)} freed` : `Seat ${two(c.outSeat || c.retSeat || c.seat)} freed`}</span>
+            </div>
+          `).join('')}
+        </div>
+      </details>` : ''}
     </section>
     <section class="card" aria-label="Seat map">
       <div class="tabs" role="tablist">${tab('out', o)}${tab('ret', r)}</div>
@@ -571,21 +705,39 @@ function renderPanel(){
   const p = S.open && pax(S.open), root = $('#panelRoot');
   if (!p) { root.innerHTML = ''; renderPanel.last = null; return; }
   const enter = renderPanel.last === p.id ? '' : ' enter'; renderPanel.last = p.id;
-  const g = goingOf(p.id), gt = trip(g.tripId), b = backOf(p.id), bt = b && trip(b.tripId), n = nights(p);
-  const back = bt ? `<tr><td>Back to KL</td><td>${short(bt.date)}<br>${bt.time}</td><td>${esc(bt.bus)}</td><td>${two(b.seat)}</td></tr>` : `<tr><td>Back to KL</td><td colspan="3" class="muted">No seat yet</td></tr>`;
+  const g = goingOf(p.id), gt = g && trip(g.tripId), b = backOf(p.id), bt = b && trip(b.tripId), n = nights(p);
+  const back = bt ? `<tr><td>Back to KL</td><td>${short(bt.date)}<br>${bt.time}</td><td>${esc(bt.bus)}</td><td>${two(b.seat)}</td></tr>` : `<tr><td>Back to KL</td><td colspan="3" class="muted">${p.status === 'cancelled' ? 'Cancelled (Seat freed)' : 'No seat yet'}</td></tr>`;
+  const going = gt ? `<tr><td>Going</td><td>${short(gt.date)}<br>${gt.time}</td><td>${esc(gt.bus)}</td><td>${two(g.seat)}</td></tr>` : `<tr><td>Going</td><td colspan="3" class="muted">${p.status === 'cancelled' ? 'Cancelled (Seat freed)' : 'No seat yet'}</td></tr>`;
   const cur = trip(S.bus);
+  const cRec = (S.cancellations || []).find(c => c.pid === p.id);
   let acts = '';
   if (p.status === 'same' || p.status === 'assigned') acts += `<button class="btn" data-act="stay" data-pid="${p.id}">Staying in Genting</button>`;
   if (p.status === 'staying' && cur && canBack(p.id, cur.pair)) acts += `<button class="btn main" data-act="sendback" data-pid="${p.id}">Book back on ${esc(cur.bus)} · ${short(cur.date)} ${trip(cur.pair).time}</button>`;
-  if (p.status !== 'returned') acts += `<button class="btn" data-act="assign" data-pid="${p.id}">${b ? 'Change return seat' : 'Assign to Return Trip'}</button>`;
+  if (p.status !== 'returned' && p.status !== 'cancelled') acts += `<button class="btn" data-act="assign" data-pid="${p.id}">${b ? 'Change return seat' : 'Assign to Return Trip'}</button>`;
+  if (p.status !== 'returned' && p.status !== 'cancelled') acts += `<button class="btn danger" data-act="ask-cancel" data-pid="${p.id}">✕ Cancel booking (Client not going)</button>`;
+  if (p.status === 'cancelled') acts += `<button class="btn main" data-act="rebook-form" data-pid="${p.id}">+ Re-book this customer</button>`;
+  
+  const cancelCardHtml = (p.status === 'cancelled' && cRec) ? `
+    <div class="cancel-card">
+      <div style="display:flex; justify-content:space-between; align-items:baseline">
+        <b>Cancellation Record</b>
+        <span class="mono" style="font-size:12px">${esc(cRec.cancelledAt)}</span>
+      </div>
+      <div>Reason: <b>${esc(cRec.reason)}</b></div>
+      <div>Freed seat(s): <b>${cRec.outSeat ? `Seat ${two(cRec.outSeat)} (Going)` : ''} ${cRec.retSeat ? `Seat ${two(cRec.retSeat)} (Return)` : ''}</b></div>
+      <div style="font-size:12.5px; color:var(--ok-deep); font-weight:500">✓ Seat removed and returned to available inventory</div>
+    </div>
+  ` : '';
+
   root.innerHTML = `<div class="shade${enter}" data-act="close"></div>
   <aside class="panel${enter}" role="dialog" aria-modal="true" aria-labelledby="pName">
     <div class="panel-top"><div><h2 id="pName">${esc(p.name)}</h2><p class="mono">${esc(p.phone)}</p></div><button class="x" data-act="close" aria-label="Close">${ICON_X}</button></div>
     <div class="panel-body">
       <div><span class="badge lg ${BADGE[p.status]}">${LONG[p.status]}</span>${n ? `<span class="meta nights">${n} night${n > 1 ? 's' : ''} in Genting</span>` : ''}</div>
+      ${cancelCardHtml}
       <table class="hist"><thead><tr><th>Trip</th><th>When</th><th>Bus</th><th>Seat</th></tr></thead>
-      <tbody><tr><td>Going</td><td>${short(gt.date)}<br>${gt.time}</td><td>${esc(gt.bus)}</td><td>${two(g.seat)}</td></tr>${back}</tbody></table>
-      ${bt && bt.id !== gt.pair ? `<div class="note">One customer record for both trips. ${esc(p.name)} was not registered again.</div>` : ''}
+      <tbody>${going}${back}</tbody></table>
+      ${bt && gt && bt.id !== gt.pair ? `<div class="note">One customer record for both trips. ${esc(p.name)} was not registered again.</div>` : ''}
       ${acts ? `<div class="stack">${acts}</div>` : ''}
     </div>
   </aside>`;
@@ -593,12 +745,139 @@ function renderPanel(){
 function render(){ renderTop(); renderOverview(); renderBoard(); renderPanel(); S.flash = null; }
 
 /* ---------- forms ---------- */
-function modal(title, body){
-  $('#modalRoot').innerHTML = `<div class="modal-bg enter" data-act="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mT"><div class="modal-top"><h2 id="mT">${title}</h2><button class="x" data-act="modal-close" aria-label="Close">${ICON_X}</button></div>${body}</div></div>`;
+function modal(title, body, isLg = false){
+  $('#modalRoot').innerHTML = `<div class="modal-bg enter" data-act="modal-bg"><div class="modal${isLg ? ' lg' : ''}" role="dialog" aria-modal="true" aria-labelledby="mT"><div class="modal-top"><h2 id="mT">${title}</h2><button class="x" data-act="modal-close" aria-label="Close">${ICON_X}</button></div>${body}</div></div>`;
   const f = $('#modalRoot').querySelector('input:not([type=radio]), select, .btn.main'); if (f) f.focus();
 }
 function closeModal(){ $('#modalRoot').innerHTML = ''; if (S.hold) { S.hold = null; render(); } }
 const seatList = (tid, pick) => { let h = ''; for (let i = 1; i <= CAP; i++) if (!seatAt(tid, i)) h += `<option value="${i}" ${i === pick ? 'selected' : ''}>Seat ${two(i)}</option>`; return h || '<option value="">Bus is full</option>'; };
+
+function cancelModal(pid){
+  const p = pax(pid);
+  if (!p) return;
+  const g = goingOf(pid), gt = g && trip(g.tripId);
+  const b = backOf(pid), bt = b && trip(b.tripId);
+  const hasBoth = g && b;
+  
+  let tripsSummary = '';
+  if (g) tripsSummary += `<div><span>Going to Genting</span><b>${esc(gt.bus)} · Seat ${two(g.seat)} (${gt.time})</b></div>`;
+  if (b) tripsSummary += `<div><span>Back to KL</span><b>${esc(bt.bus)} · Seat ${two(b.seat)} (${bt.time})</b></div>`;
+  if (!g && !b) tripsSummary += `<div><span>Status</span><b>Waiting to confirm return trip</b></div>`;
+
+  const scopeHtml = hasBoth ? `
+    <div style="display:flex; flex-direction:column; gap:6px">
+      <span style="font-weight:500; font-size:14px">Select cancellation scope:</span>
+      <div class="choice">
+        <label><input type="radio" name="cScope" value="all" checked> Cancel whole trip (Release seats ${two(g.seat)} & ${two(b.seat)})</label>
+        <label><input type="radio" name="cScope" value="out"> Going trip only (Release seat ${two(g.seat)})</label>
+        <label><input type="radio" name="cScope" value="ret"> Return trip only (Release seat ${two(b.seat)})</label>
+      </div>
+    </div>
+  ` : `<input type="hidden" name="cScope" value="${g ? 'all' : 'ret'}">`;
+
+  modal(`Cancel booking · ${esc(p.name)}`, `<form id="cancelForm" data-pid="${pid}">
+    <div class="confirm-box">
+      <span>Customer</span><b>${esc(p.name)} (${esc(p.phone)})</b>
+      ${tripsSummary}
+    </div>
+    ${scopeHtml}
+    <label>Reason client is not going
+      <select id="cReason">
+        <option value="Client suddenly cannot make it / Change of plan">Client suddenly cannot make it / Change of plan</option>
+        <option value="Personal emergency / Family matter">Personal emergency / Family matter</option>
+        <option value="Medical / Unwell / Sick">Medical / Unwell / Sick</option>
+        <option value="No show at departure location">No show at departure location</option>
+        <option value="Duplicate booking / Mistake">Duplicate booking / Mistake</option>
+        <option value="other">Other reason (specify below)...</option>
+      </select>
+    </label>
+    <label id="cCustomWrap" style="display:none">
+      Specify reason
+      <input id="cCustomReason" placeholder="Enter reason for cancellation">
+    </label>
+    <div class="cancel-card" style="font-size:13px">
+      <b>Immediate action:</b> The client's seat will be removed and immediately marked Free on the coach seat map. A cancellation record will be logged.
+    </div>
+    <div class="foot">
+      <button type="button" class="btn" data-act="modal-close">Keep booking</button>
+      <button type="submit" class="btn danger-fill">Confirm cancellation & release seat</button>
+    </div>
+  </form>`);
+}
+
+function cancellationsModal(){
+  const dayRecs = cancellationsOn(S.day);
+  const rows = dayRecs.map(c => `
+    <tr>
+      <td class="mono" style="font-size:13px; white-space:nowrap">${esc(c.cancelledAt)}</td>
+      <td>
+        <b>${esc(c.name)}</b>
+        <div class="mono muted" style="font-size:12.5px">${esc(c.phone)}</div>
+      </td>
+      <td>
+        <b>${esc(c.busName)}</b>
+        <div class="muted" style="font-size:12.5px">${esc(c.plate)} · ${c.dir === 'ret' ? 'Back to KL' : c.dir === 'out' ? 'Going to Genting' : 'Both trips'}</div>
+      </td>
+      <td>
+        <span class="badge cancelled" style="font-weight:600">Seat ${two(c.outSeat || c.retSeat || c.seat)}</span>
+        ${c.outSeat && c.retSeat ? `<span class="badge cancelled" style="font-weight:600">Ret ${two(c.retSeat)}</span>` : ''}
+      </td>
+      <td style="font-size:13px">${esc(c.reason)}</td>
+      <td><span style="display:inline-flex; align-items:center; gap:4px; font-size:12.5px; font-weight:600; color:var(--ok)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Released</span></td>
+    </tr>
+  `).join('');
+
+  modal(`Cancellation Records · ${dayName(S.day)}`, `
+    <div style="padding:16px 18px; display:flex; flex-direction:column; gap:16px">
+      <p style="margin:0; font-size:14px; color:var(--muted)">
+        Total cancellations on ${dayName(S.day)}: <b>${dayRecs.length}</b> client${dayRecs.length === 1 ? '' : 's'}. All freed seats are available for immediate re-booking.
+      </p>
+      <div class="table-wrap" style="max-height:55vh; overflow-y:auto">
+        <table class="cancel-tbl">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Customer</th>
+              <th>Coach</th>
+              <th>Freed Seat</th>
+              <th>Reason</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="6" class="muted" style="text-align:center; padding:24px">No cancellations recorded for this day.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div class="foot">
+        <button type="button" class="btn main" data-act="modal-close">Close</button>
+      </div>
+    </div>
+  `, true);
+}
+
+function cancelDetailModal(cid){
+  const c = (S.cancellations || []).find(x => x.id === cid);
+  if (!c) return;
+  modal(`Cancellation Record · ${esc(c.name)}`, `
+    <div style="padding:18px; display:flex; flex-direction:column; gap:14px">
+      <div class="confirm-box" style="grid-template-columns:auto 1fr">
+        <span>Record ID</span><b class="mono">${c.id}</b>
+        <span>Customer</span><b>${esc(c.name)}</b>
+        <span>Phone</span><b class="mono">${esc(c.phone)}</b>
+        <span>Coach</span><b>${esc(c.busName)} (${esc(c.plate)})</b>
+        <span>Time cancelled</span><b>${c.cancelledAt}</b>
+        <span>Freed seat(s)</span><b><span class="badge cancelled">Seat ${two(c.outSeat || c.retSeat || c.seat)}</span> ${c.outSeat && c.retSeat ? `<span class="badge cancelled">Seat ${two(c.retSeat)}</span>` : ''} (Freed)</b>
+        <span>Reason</span><b>${esc(c.reason)}</b>
+        <span>Seat status</span><b style="color:var(--ok)">✓ Seat released & available for booking on coach map</b>
+      </div>
+      <div class="foot">
+        <button type="button" class="btn" data-act="modal-close">Close</button>
+        ${c.pid && pax(c.pid) ? `<button type="button" class="btn main" data-act="open" data-pid="${c.pid}">View customer</button>` : ''}
+      </div>
+    </div>
+  `);
+}
 
 function askConfirm(pid, tid, seat){
   const p = pax(pid), t = trip(tid);
@@ -611,12 +890,12 @@ function askConfirm(pid, tid, seat){
     <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main">Confirm booking</button></div>
   </form>`);
 }
-function addForm(tid, n){
+function addForm(tid, n, preName = '', prePhone = ''){
   const t = trip(tid);
   if (!freeSeat(tid)) { toast(`${t.bus} is full going to Genting.`); return; }
   modal(`Add customer · ${esc(t.bus)} going to Genting`, `<form id="addForm" data-trip="${tid}" novalidate>
-    <label>Name<input id="fName" autocomplete="off"></label>
-    <label>Phone<input id="fPhone" autocomplete="off" inputmode="tel"></label>
+    <label>Name<input id="fName" value="${esc(preName)}" autocomplete="off"></label>
+    <label>Phone<input id="fPhone" value="${esc(prePhone)}" autocomplete="off" inputmode="tel"></label>
     <div id="dup"></div>
     <label>Seat going to Genting<select id="fSeat">${seatList(tid, freeSeat(tid, n))}</select></label>
     <div class="foot"><button type="button" class="btn" data-act="modal-close">Cancel</button><button type="submit" class="btn main" id="fSave">Add to Going to Genting</button></div>
@@ -637,8 +916,8 @@ function backForm(tid, n){
 }
 function checkDup(){
   const nm = $('#fName').value.trim().toLowerCase(), ph = digits($('#fPhone').value);
-  const hit = (ph.length >= 7 && S.passengers.find(p => digits(p.phone) === ph)) || (nm && S.passengers.find(p => p.name.toLowerCase() === nm));
-  $('#dup').innerHTML = hit ? `<div class="msg"><span><b>${esc(hit.name)}</b> (${esc(hit.phone)}) is already a customer. No need to add again.</span><button type="button" class="btn sm" data-act="open" data-pid="${hit.id}">Open ${esc(hit.name)}</button></div>` : '';
+  const hit = (ph.length >= 7 && S.passengers.find(p => p.status !== 'cancelled' && digits(p.phone) === ph)) || (nm && S.passengers.find(p => p.status !== 'cancelled' && p.name.toLowerCase() === nm));
+  $('#dup').innerHTML = hit ? `<div class="msg"><span><b>${esc(hit.name)}</b> (${esc(hit.phone)}) is already an active customer. No need to add again.</span><button type="button" class="btn sm" data-act="open" data-pid="${hit.id}">Open ${esc(hit.name)}</button></div>` : '';
   $('#fSave').disabled = !!hit;
 }
 function assignForm(pid){
@@ -698,6 +977,19 @@ document.addEventListener('click', e => {
     case 'edit-trip': tripForm(el.dataset.trip); return;
     case 'modal-close': closeModal(); return;
     case 'modal-bg': if (e.target === el) closeModal(); return;
+    case 'ask-cancel': cancelModal(pid); return;
+    case 'view-cancellations': cancellationsModal(); return;
+    case 'open-cancel': cancelDetailModal(el.dataset.cid); return;
+    case 'rebook-form': {
+      const p = pax(pid);
+      if (p) {
+        const cur = trip(S.bus);
+        $('#panelRoot').innerHTML = '';
+        S.open = null;
+        addForm(cur.id, freeSeat(cur.id), p.name, p.phone);
+      }
+      return;
+    }
     case 'seat': {
       const t = trip(el.dataset.trip), n = +el.dataset.seat, b = seatAt(t.id, n);
       if (b) { S.open = b.pid; break; }
@@ -722,10 +1014,29 @@ document.addEventListener('input', e => {
     const f = document.getElementById(id); f.focus(); f.setSelectionRange(f.value.length, f.value.length);
   }
 });
-document.addEventListener('change', e => { if (e.target.id === 'aTrip') $('#aSeat').innerHTML = seatList(e.target.value, freeSeat(e.target.value)); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'aTrip') $('#aSeat').innerHTML = seatList(e.target.value, freeSeat(e.target.value));
+  if (e.target.id === 'cReason') {
+    const wrap = $('#cCustomWrap');
+    if (wrap) wrap.style.display = e.target.value === 'other' ? 'flex' : 'none';
+  }
+});
 document.addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target;
+  if (f.id === 'cancelForm') {
+    const pid = f.dataset.pid;
+    const scopeEl = f.querySelector('input[name=cScope]:checked') || f.querySelector('input[name=cScope]');
+    const scope = scopeEl ? scopeEl.value : 'all';
+    let reason = $('#cReason').value;
+    if (reason === 'other') {
+      reason = ($('#cCustomReason')?.value.trim()) || 'Client cancelled';
+    }
+    cancelBooking({pid, scope, reason});
+    $('#modalRoot').innerHTML = '';
+    render();
+    return;
+  }
   if (f.id === 'confirmForm') {
     const h = S.hold; S.hold = null; $('#modalRoot').innerHTML = '';
     if (h && assignBack(h.pid, h.tid, h.seat)) { S.tab = 'ret'; }
